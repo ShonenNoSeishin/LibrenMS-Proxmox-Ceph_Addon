@@ -10,7 +10,8 @@ This project is a customization of LibrenMS and LibrenMS agent to allow users to
 
 Hyperlink for each VM running :
 
-![image](https://github.com/user-attachments/assets/fe28683a-bf09-42e0-93fe-e0eab4bf8076)
+![image](https://github.com/user-attachments/assets/b3888973-8141-43da-802e-54c297587390)
+
 
 If you click on, it show you the traffic of each network interfaces of the VM selected :
 
