@@ -5,7 +5,42 @@
 This project is a customization of LibrenMS and LibrenMS agent to allow users to monitore more informations about Proxmox VE VMs and Ceph informations on the PVE.
 
 # Functionnalities overview
-<add screenshots>
+
+## Apps -> Proxmox
+
+Hyperlink for each VM running :
+
+![image](https://github.com/user-attachments/assets/fe28683a-bf09-42e0-93fe-e0eab4bf8076)
+
+If you click on, it show you the traffic of each network interfaces of the VM selected :
+
+![image](https://github.com/user-attachments/assets/2faf47f4-b8d5-407f-9207-1614421a902b)
+
+Tab with every VMs monitored informations :
+
+![image](https://github.com/user-attachments/assets/9a0fbba9-9515-4fcc-a81f-0a2f70f28de7)
+
+## Device -> Apps -> Proxmox
+
+Tab with every VMs informations of the device monitored :
+
+![image](https://github.com/user-attachments/assets/b50cc176-466e-4645-9a8a-7fd1d3918154)
+
+Network graphs of each VMs :
+
+![image](https://github.com/user-attachments/assets/2a00592e-9aa3-4d08-9f8d-e7c5e4420e84)
+
+## Device -> Apps -> Ceph
+
+Tab with Ceph disk state (if it has a disk that isn't 'up', it show it) :
+
+![image](https://github.com/user-attachments/assets/f05db53f-c083-43db-ab42-ffd97800b9fa)
+
+Ceph informations :
+
+![image](https://github.com/user-attachments/assets/d2f437fb-7255-42e1-a7b0-1ea747b32dee)
+
+...
 
 # Requirements
 
