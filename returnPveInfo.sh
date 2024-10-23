@@ -24,32 +24,35 @@ if [ $? -eq 0 ]; then
     VM_LIST=$(pvesh get /nodes/$(hostname)/qemu 2>/dev/null)
   fi
 
+  # Récupérer les informations des OSD Ceph au format JSON
   ceph_data=$(/usr/bin/ceph osd df -f json)
 
+  # Vérification si la commande a réussi
   if [ $? -ne 0 ]; then
       echo "Error with Ceph execution"
       exit 1
   fi
 
+  # Extraire le statut des OSD et initialiser les variables
   warning=false
   warned_disks=""
 
-  echo "$ceph_data" | jq -c '.nodes[]' | while IFS= read -r osd; do
+  while IFS= read -r osd; do
       name=$(echo "$osd" | jq -r '.name')
       status=$(echo "$osd" | jq -r '.status')
-
       if [[ "$status" != "up" ]]; then
           warning=true
           warned_disks+="$name "
       fi
-  done
+  done < <(echo "$ceph_data" | jq -c '.nodes[]')
 
   Ceph_Info=""
-  if [ "$warning" = true ]; then
+  if [ $warning = true ]; then
       Ceph_Info="WARNING : Followed disks aren't 'up' : $warned_disks"
   else
       Ceph_Info="Disks 'up'"
   fi
+echo "$Ceph_Info"
 
   # Initialize an array to hold updated VM information
   UPDATED_VMS=()
@@ -85,9 +88,9 @@ if [ $? -eq 0 ]; then
               size_num=$(echo "$size" | sed 's/[^0-9.]//g')
               if (( $(echo "$size_num > 2" | bc -l) )) && [[ "$sizeUnit" == "GiB" ]] || [[ "$sizeUnit" != "MiB" ]]; then
                   used_num=$(echo "$used" | sed 's/[^0-9.]//g')
-                  Percent=$(awk "BEGIN {print ($used_num/$size_num) * 100}")
-                  if (( $(echo "$BIGGER < $Percent" | bc -l) )); then
-                      BIGGER=$Percent
+                  POURCENT=$(awk "BEGIN {print ($used_num/$size_num) * 100}")
+                  if (( $(echo "$BIGGER < $POURCENT" | bc -l) )); then
+                      BIGGER=$POURCENT
                   fi
                   ARRAY_DISKS+=("$name : $used_num / $size_num $sizeUnit")
               fi
@@ -109,14 +112,14 @@ if [ $? -eq 0 ]; then
       UPDATED_ELMNT=$(echo "$ELMNT" | jq \
           --arg cpu "$CPU_DATA" \
           --argjson cephDisks "$(printf '%s\n' "${ARRAY_DISKS[@]}" | jq -R . | jq -s .)" \
-          --arg cephBiggerDiskPercentUsage "$(printf '%.2f' $BIGGER)" \
+          --arg cephBiggerDiskPourcentUsage "$(printf '%.2f' $BIGGER)" \
           --arg totalSnapshots "$(printf '%.1f' $TOTAL_SNAPSHOTS)" \
           --argjson cephSnapshots "$(printf '%s\n' "${ARRAY_SNAPSHOTS[@]}" | jq -R . | jq -s .)" \
           --arg clustername "$clustername" \
           --arg qemuInfo "$QEMU_INFO" \
           --arg cephInfo "$Ceph_Info" \
           --arg oldestSnapshot "$max_days" \
-          '. + {cpu: $cpu, cephDisks: $cephDisks, cephBiggerDiskPercentUsage: $cephBiggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
+          '. + {cpu: $cpu, cephDisks: $cephDisks, cephBiggerDiskPourcentUsage: $cephBiggerDiskPourcentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
 
       UPDATED_VMS+=("$UPDATED_ELMNT")
   done
