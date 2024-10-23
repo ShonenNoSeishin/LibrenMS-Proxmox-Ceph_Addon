@@ -52,7 +52,6 @@ if [ $? -eq 0 ]; then
   else
       Ceph_Info="Disks 'up'"
   fi
-echo "$Ceph_Info"
 
   # Initialize an array to hold updated VM information
   UPDATED_VMS=()
