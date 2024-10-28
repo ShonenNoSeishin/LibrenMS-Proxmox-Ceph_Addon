@@ -82,15 +82,25 @@ chmod +x script1.sh
 To do after : 
 
 - Go to web interface and configure what it ask to you
+
   -> If you get some NTP issue, please adapt PHP, Mysql and Linux NTP settings to be the same 
+
     => timezone Mysql
+
         => mysql -u root -p -e "SET GLOBAL time_zone = '+02:00';" && timedatectl set-timezone Europe/Brussels
+
     => timezone PHP
+
         => nano /etc/php/8.3/cli/php.ini --> date.timezone = "Europe/Paris"
+
         => nano /etc/php/8.3/fpm/php.ini --> date.timezone = "Europe/Paris"
+
         => systemctl restart phpsessionclean.timer && systemctl restart phpsessionclean.service && systemctl restart php8.3-fpm.service
+
 - setup the followings by the web interface
+
   -> global -> discovery -> check applications and Hypervisor VM info
+
   -> global -> poller -> check applications, Hypervisor VM info and Unix Agent
 
 ## Install LibrenMS agent and custom addon on PVE node
@@ -141,6 +151,8 @@ proxmox:
 - { Field: ceph_state, Type: varchar(50), 'Null': false, Extra: '', Default: '0' }
 ````
 
+## Update LibrenMS files to implement the addon 
+
 On LibrenMS machine, run the script 3 :
 
 ````bash
@@ -151,7 +163,9 @@ chmod +x script3.sh
 To do after : 
 
 - add your pve device
+
   -> After map a PVE device, please go to device and select the new device -> apps -> parameters -> check Proxmox and unix agent
+
 - force polling and update data
 
 ````bash
