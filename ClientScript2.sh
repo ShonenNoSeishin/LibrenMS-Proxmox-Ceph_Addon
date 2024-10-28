@@ -15,7 +15,17 @@ wget https://raw.githubusercontent.com/librenms/librenms-agent/master/agent-loca
 chmod 755 /usr/local/bin/proxmox
 # Check the "minimal_snmpd_conf.conf" file of this Git and edit your SNMP conf
 # Change community
-sudo sed -i 's/public/LibrenMSPublic/' /etc/snmp/snmpd.conf
+read -p "Entrez l'adresse IP de la machine LibreNMS : " LibrenmsIP
+if [[ -z "$LibrenmsIP" ]]; then
+    echo "Erreur : Vous devez fournir une adresse IP."
+    exit 1
+fi
+sudo sed -i "s/^rocommunity public default -V systemonly/rocommunity LibrenMSPublic $LibrenmsIP -V systemonly/" /etc/snmp/snmpd.conf
+if [[ $? -eq 0 ]]; then
+    echo "La ligne rocommunity a été mise à jour avec succès dans /etc/snmp/snmpd.conf."
+else
+    echo "Erreur lors de la mise à jour de la ligne rocommunity."
+fi
 # Install the LibrenMS agent
 cd /opt/
 git clone https://github.com/librenms/librenms-agent.git
@@ -69,3 +79,4 @@ if ! grep -Fxq "$snmpd_entry" /etc/snmp/snmpd.conf; then
 else
     echo "Entry already exists in /etc/snmp/snmpd.conf."
 fi
+systemctl restart snmpd
