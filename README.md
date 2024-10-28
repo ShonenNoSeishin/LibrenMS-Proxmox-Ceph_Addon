@@ -249,12 +249,6 @@ If you still have issue with your PVE Dashboards, please refer to the issue i re
 
 # Custom addon
 
-Let's import two bash scripts from this git :
-
-````bash
-wget
-`````
-
 Modify the /opt/librenms/misc/db_schema.yaml for the proxmox bloc :
 
 ````bash
