@@ -112,7 +112,7 @@ chmod +x ClientScript2.sh
 
 To do after : 
 
-- modify yaml file to make the proxmox part similar
+- modify /opt/librenms/misc/db_schema.yaml file on the LibrenMS machine to make the proxmox part similar
 
 ````bash
 proxmox:
@@ -148,7 +148,13 @@ proxmox:
 - in the same file, add this to "devices" section :
 
 ````bash
-- { Field: ceph_state, Type: varchar(50), 'Null': false, Extra: '', Default: '0' }
+  - { Field: ceph_state, Type: varchar(50), 'Null': false, Extra: '', Default: '0' }
+````
+
+and run :
+
+````bash
+systemctl restart mysql
 ````
 
 ## Update LibrenMS files to implement the addon 
