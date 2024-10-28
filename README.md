@@ -295,6 +295,8 @@ Apply changes in the database :
 mysql -u root -p<enter the databse password here> -e "Use librenms; ALTER TABLE proxmox ADD hostname varchar(255) NULL AFTER vmid, ADD name varchar(255) NULL AFTER last_seen, ADD status varchar(50) NULL AFTER name, ADD cpu int NULL AFTER status, ADD cpus int NULL AFTER cpu, ADD mem bigint NULL AFTER cpus, ADD maxmem bigint NULL AFTER mem, ADD disk bigint NULL AFTER maxmem, ADD maxdisk bigint NULL AFTER disk, ADD netin bigint NULL AFTER maxdisk, ADD netout bigint NULL AFTER netin, ADD uptime int NULL AFTER netout; ALTER TABLE proxmox MODIFY cluster VARCHAR(255) DEFAULT NULL; ALTER TABLE proxmox CHANGE cluster cluster varchar(255) NOT NULL ; ALTER TABLE proxmox ADD ceph_disks text NULL AFTER uptime; ALTER TABLE proxmox ADD ceph_bigger_disk_pourcent_usage float NULL AFTER ceph_disks; ALTER TABLE proxmox ADD ceph_snapshots text NULL AFTER ceph_bigger_disk_pourcent_usage; ALTER TABLE proxmox ADD ceph_total_snapshots float NULL AFTER ceph_snapshots; ALTER TABLE proxmox ADD qemu_info text NULL AFTER ceph_total_snapshots; ALTER TABLE proxmox ADD oldest_snapshot int NULL AFTER ceph_total_snapshots;" && systemctl restart mysql
 ```
 
+## In the PVE node
+
 Get the Custom scripts and configure them :
 
 ````bash
