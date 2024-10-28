@@ -47,7 +47,118 @@ Ceph informations :
 
 You already should have a configured PVE with Ceph (I think it should work without Ceph but I havent tested it). You also should have a VM or machine to run LibrenMS. Personnally, I have used an Ubuntu 24.04.
 
-# LibrenMS Installation 
+# LibrenMS Script Installation 
+
+## Notes
+
+- The default password defined by the scripts for the database is 'Password666'
+- The default community for every snmp instances defined by the script is 'LibrenMSPublic'
+- I've run these scripts with root user
+
+## Download requirements
+
+Download script 1 and 3 on LibrenMS machine :
+
+````bash
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/script1.sh
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/script3.sh
+````
+Download script 2 on PVE node :
+
+
+````bash
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/ClientScript2.sh
+````
+
+# Install LibrenMS
+
+On LibrenMS machine, run the script 1 :
+
+````bash
+chmod +x script1.sh
+./script1.sh
+````
+
+To do after : 
+
+- Go to web interface and configure what it ask to you
+  -> If you get some NTP issue, please adapt PHP, Mysql and Linux NTP settings to be the same 
+    => timezone Mysql
+        => mysql -u root -p -e "SET GLOBAL time_zone = '+02:00';" && timedatectl set-timezone Europe/Brussels
+    => timezone PHP
+        => nano /etc/php/8.3/cli/php.ini --> date.timezone = "Europe/Paris"
+        => nano /etc/php/8.3/fpm/php.ini --> date.timezone = "Europe/Paris"
+        => systemctl restart phpsessionclean.timer && systemctl restart phpsessionclean.service && systemctl restart php8.3-fpm.service
+- setup the followings by the web interface
+  -> global -> discovery -> check applications and Hypervisor VM info
+  -> global -> poller -> check applications, Hypervisor VM info and Unix Agent
+
+## Install LibrenMS agent and custom addon on PVE node
+
+````bash
+chmod +x ClientScript2.sh
+./ClientScript2.sh
+````
+
+To do after : 
+
+- modify yaml file to make the proxmox part similar
+
+````bash
+proxmox:
+  Columns:
+    - { Field: id, Type: 'int unsigned', 'Null': false, Extra: auto_increment }
+    - { Field: device_id, Type: 'int unsigned', 'Null': false, Extra: '', Default: '0' }
+    - { Field: vmid, Type: int, 'Null': false, Extra: '' }
+    - { Field: hostname, Type: varchar(255), 'Null': true, Extra: '' }
+    - { Field: cluster, Type: varchar(255), 'Null': false, Extra: '' }
+    - { Field: description, Type: varchar(255), 'Null': true, Extra: '' }
+    - { Field: last_seen, Type: timestamp, 'Null': false, Extra: '', Default: CURRENT_TIMESTAMP }
+    - { Field: name, Type: varchar(255), 'Null': true, Extra: '' }
+    - { Field: status, Type: varchar(50), 'Null': true, Extra: '' }
+    - { Field: cpu, Type: 'int', 'Null': true, Extra: '' }
+    - { Field: cpus, Type: 'int', 'Null': true, Extra: '' }
+    - { Field: mem, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: maxmem, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: disk, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: maxdisk, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: netin, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: netout, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: uptime, Type: 'int', 'Null': true, Extra: '' }
+    - { Field: ceph_disks, Type: text, 'Null': true, Extra: '' }
+    - { Field: ceph_bigger_disk_percent_usage, Type: float, 'Null': true, Extra: '' }
+    - { Field: ceph_snapshots, Type: text, 'Null': true, Extra: '' }
+    - { Field: ceph_total_snapshots, Type: float, 'Null': true, Extra: '' }
+    - { Field: oldest_snapshot, Type: int, 'Null': true, Extra: '' }
+    - { Field: qemu_info, Type: text, 'Null': true, Extra: '' }
+  Indexes:
+    PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
+    proxmox_cluster_vmid_unique: { Name: proxmox_cluster_vmid_unique, Columns: [cluster, vmid], Unique: true, Type: BTREE }
+````
+- in the same file, add this to "devices" section :
+
+````bash
+- { Field: ceph_state, Type: varchar(50), 'Null': false, Extra: '', Default: '0' }
+````
+
+On LibrenMS machine, run the script 3 :
+
+````bash
+chmod +x script3.sh
+./script3.sh
+````
+
+To do after : 
+
+- add your pve device
+  -> After map a PVE device, please go to device and select the new device -> apps -> parameters -> check Proxmox and unix agent
+- force polling and update data
+
+````bash
+sudo -u librenms lnms device:poll all && sudo -u librenms php discovery.php -h * && sudo -u librenms ./daily.sh
+````
+
+# LibrenMS Manual Installation 
 Firstly, you should install LibrenMS following the installation guide --> https://docs.librenms.org/Installation/Install-LibreNMS/ 
 
 Here are the steps I followed to install LibrenMS :
