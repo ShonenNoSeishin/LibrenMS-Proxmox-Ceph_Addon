@@ -179,6 +179,9 @@ sudo -u librenms lnms device:poll all && sudo -u librenms php discovery.php -h *
 ````
 
 # LibrenMS Manual Installation 
+
+## Base installation 
+
 Firstly, you should install LibrenMS following the installation guide --> https://docs.librenms.org/Installation/Install-LibreNMS/ 
 
 Here are the steps I followed to install LibrenMS :
@@ -289,7 +292,7 @@ chown librenms:librenms /opt/librenms/config.php
 vim /opt/librenms/.env 
 ````
 
-# Download snmp-mibs-downloader
+## Download snmp-mibs-downloader
 
 As we are going to configure a custom OID, we should download snmp-mibs-download on both LibrenMS machine and PVE machine.
 
@@ -302,11 +305,11 @@ apt-get install snmp-mibs-downloader -y
 download-mibs
 ````
 
-# Configure PVE as LibrenMS client
+## Configure PVE as LibrenMS client
 
 Once LibrenMS is installed, you can configure PVE as LibrenMS client. Note that you should do this configuration for each Proxmox node.
 
-## Classic agent installation
+### Classic agent installation
 
 Before installing the custom functionalities, let's install the classic LibrenMS agent. 
 
@@ -326,6 +329,8 @@ vim /etc/snmp/snmpd.conf
 cd /opt/
 git clone https://github.com/librenms/librenms-agent.git
 cd librenms-agent
+cp check_mk_agent /usr/bin/check_mk_agent
+chmod +x /usr/bin/check_mk_agent
 mkdir -p /usr/lib/check_mk_agent/local/ /usr/lib/check_mk_agent/plugins
 cp /opt/librenms-agent/agent-local/proxmox /usr/lib/check_mk_agent/local/proxmox
 chmod +x /usr/lib/check_mk_agent/local/proxmox
@@ -378,7 +383,7 @@ If you still have issue with your PVE Dashboards, please refer to the issue i re
 
 --> https://github.com/librenms/librenms/issues/16509
 
-# Custom addon
+## Custom addon
 
 Modify the /opt/librenms/misc/db_schema.yaml for the proxmox bloc :
 
@@ -423,10 +428,10 @@ in the same file, add this line to the "devices" bloc :
 Apply changes in the database :
 
 ```bash
-mysql -u root -p<enter the databse password here> -e "Use librenms; ALTER TABLE proxmox ADD hostname varchar(255) NULL AFTER vmid, ADD name varchar(255) NULL AFTER last_seen, ADD status varchar(50) NULL AFTER name, ADD cpu int NULL AFTER status, ADD cpus int NULL AFTER cpu, ADD mem bigint NULL AFTER cpus, ADD maxmem bigint NULL AFTER mem, ADD disk bigint NULL AFTER maxmem, ADD maxdisk bigint NULL AFTER disk, ADD netin bigint NULL AFTER maxdisk, ADD netout bigint NULL AFTER netin, ADD uptime int NULL AFTER netout; ALTER TABLE proxmox MODIFY cluster VARCHAR(255) DEFAULT NULL; ALTER TABLE proxmox CHANGE cluster cluster varchar(255) NOT NULL ; ALTER TABLE proxmox ADD ceph_disks text NULL AFTER uptime; ALTER TABLE proxmox ADD ceph_bigger_disk_pourcent_usage float NULL AFTER ceph_disks; ALTER TABLE proxmox ADD ceph_snapshots text NULL AFTER ceph_bigger_disk_pourcent_usage; ALTER TABLE proxmox ADD ceph_total_snapshots float NULL AFTER ceph_snapshots; ALTER TABLE proxmox ADD qemu_info text NULL AFTER ceph_total_snapshots; ALTER TABLE proxmox ADD oldest_snapshot int NULL AFTER ceph_total_snapshots;" && systemctl restart mysql
+mysql -u root -p<enter the databse password here> -e "Use librenms; ALTER TABLE proxmox ADD name varchar(255) NULL AFTER last_seen, ADD status varchar(50) NULL AFTER name, ADD hostname varchar(255) NULL AFTER vmid, ADD cpu int NULL AFTER status, ADD cpus int NULL AFTER cpu, ADD mem bigint NULL AFTER cpus, ADD maxmem bigint NULL AFTER mem, ADD disk bigint NULL AFTER maxmem, ADD maxdisk bigint NULL AFTER disk, ADD netin bigint NULL AFTER maxdisk, ADD netout bigint NULL AFTER netin, ADD uptime int NULL AFTER netout; ALTER TABLE proxmox MODIFY cluster VARCHAR(255) DEFAULT NULL; ALTER TABLE proxmox CHANGE cluster cluster varchar(255) NOT NULL ; ALTER TABLE proxmox ADD ceph_disks text NULL AFTER uptime; ALTER TABLE proxmox ADD ceph_bigger_disk_percent_usage float NULL AFTER ceph_disks; ALTER TABLE proxmox ADD ceph_snapshots text NULL AFTER ceph_bigger_disk_pourcent_usage; ALTER TABLE proxmox ADD ceph_total_snapshots float NULL AFTER ceph_snapshots; ALTER TABLE proxmox ADD qemu_info text NULL AFTER ceph_total_snapshots; ALTER TABLE proxmox ADD oldest_snapshot int NULL AFTER ceph_total_snapshots; ALTER TABLE devices ADD ceph_state varchar(50) NULL;" && systemctl restart mysql
 ```
 
-## In the PVE node
+### In the PVE node
 
 Get the Custom scripts and configure them :
 
@@ -475,7 +480,7 @@ Now, you should be able to trigger the script via snmp like this from the Libren
 snmpwalk -v 2c -c <community> <PVE_MACHINE_IP> .1.3.6.1.4.1.8072.1.3.2.3.1.2.9.99.117.115.116.111.109.80.86.69
 ````
 
-## Modify LibrenMS files
+### Modify LibrenMS files
 
 It has several files I have modified to pimp the dashboard, here are commands to download them from this git and put them to the right place.
 
@@ -497,7 +502,7 @@ rm includes/html/pages/device/apps/proxmox.inc.php
 wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/proxmox.inc.php -O includes/html/pages/device/apps/proxmox.inc.php
 ```
 
-# Useful commands
+## Useful commands
 
 Mysql commands :
 ````bash
@@ -517,13 +522,13 @@ sudo -u librenms /opt/librenms/daily.sh
 sudo -u librenms /opt/librenms/validate.php
 ````
 
-# Alerting
+## Alerting
 
-## Examples of alerts
+### Examples of alerts
 
 ![image](https://github.com/user-attachments/assets/406f7b18-954c-4a91-984c-432183bbeb6b)
 
 
-## Alerting by email
+### Alerting by email
 
 I followed this documentation -> https://ws.learn.ac.lk/wiki/NSM2021/Agenda/AlertsLibrenms
