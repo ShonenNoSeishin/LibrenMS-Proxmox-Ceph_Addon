@@ -27,7 +27,7 @@ if [[ -z "$PVE_IP" ]]; then
     exit 1
 fi
 
-sudo sed -i "s/^rocommunity public default -V systemonly/rocommunity LibrenMSPublic $LibrenmsIP -V systemonly\nrocommunity LibrenMSPublic 127.0.0.1 -V systemonly/" /etc/snmp/snmpd.conf
+sudo sed -i "s/^rocommunity public default -V systemonly/rocommunity LibrenMSPublic $LibrenmsIP\nrocommunity LibrenMSPublic 127.0.0.1/" /etc/snmp/snmpd.conf
 # Change community v6
 sudo sed -i 's/public/LibrenMSPublic/' /etc/snmp/snmpd.conf
 
