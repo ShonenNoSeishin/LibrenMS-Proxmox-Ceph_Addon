@@ -2,7 +2,7 @@
 # Update and upgrade
 apt update -y && apt upgrade -y
 # Install the requirements
-apt-get install libpve-apiclient-perl snmp snmpd git -y
+apt-get install libpve-apiclient-perl snmp snmpd git jq -y
 # Update apt source list to install snmp-mibs-downloader
 echo "# non-free for snmp-mibs-downloader" >> /etc/apt/sources.list
 echo "deb http://http.us.debian.org/debian stable main contrib non-free" >> /etc/apt/sources.list
