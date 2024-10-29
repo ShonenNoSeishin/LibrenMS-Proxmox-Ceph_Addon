@@ -13,19 +13,32 @@ download-mibs
 wget https://raw.githubusercontent.com/librenms/librenms-agent/master/agent-local/proxmox -O /usr/local/bin/proxmox
 # Give the corrects rights to the script 
 chmod 755 /usr/local/bin/proxmox
-# Check the "minimal_snmpd_conf.conf" file of this Git and edit your SNMP conf
-# Change community
-read -p "Entrez l'adresse IP de la machine LibreNMS : " LibrenmsIP
+read -p "enter the IP address of Librenms machine : " LibrenmsIP
+
 if [[ -z "$LibrenmsIP" ]]; then
-    echo "Erreur : Vous devez fournir une adresse IP."
+    echo "Error : please give the LibreNMS IP address."
     exit 1
 fi
-sudo sed -i "s/^rocommunity public default -V systemonly/rocommunity LibrenMSPublic $LibrenmsIP -V systemonly/" /etc/snmp/snmpd.conf
-if [[ $? -eq 0 ]]; then
-    echo "La ligne rocommunity a été mise à jour avec succès dans /etc/snmp/snmpd.conf."
-else
-    echo "Erreur lors de la mise à jour de la ligne rocommunity."
+
+read -p "Enter PVE IP address : " PVE_IP
+
+if [[ -z "$PVE_IP" ]]; then
+    echo "Error : please give the PVE IP address."
+    exit 1
 fi
+
+sudo sed -i "s/^rocommunity public default -V systemonly/rocommunity LibrenMSPublic $LibrenmsIP -V systemonly\nrocommunity LibrenMSPublic 127.0.0.1 -V systemonly/" /etc/snmp/snmpd.conf
+# Change community v6
+sudo sed -i 's/public/LibrenMSPublic/' /etc/snmp/snmpd.conf
+
+echo "agentaddress $PVE_IP" >> /etc/snmp/snmpd.conf
+
+if [[ $? -eq 0 ]]; then
+    echo "Update community and agentaddress successfully in /etc/snmp/snmpd.conf."
+else
+    echo "Error updating community and agentaddress."
+fi
+
 # Install the LibrenMS agent
 cd /opt/
 git clone https://github.com/librenms/librenms-agent.git
@@ -79,4 +92,6 @@ if ! grep -Fxq "$snmpd_entry" /etc/snmp/snmpd.conf; then
 else
     echo "Entry already exists in /etc/snmp/snmpd.conf."
 fi
+
+
 systemctl restart snmpd
