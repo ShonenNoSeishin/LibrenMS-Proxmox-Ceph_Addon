@@ -149,7 +149,7 @@ if ($result->num_rows > 0) {
         // Custom OID
         $oid = ".1.3.6.1.4.1.8072.1.3.2.3.1.2.9.99.117.115.116.111.109.80.86.69";
 
-        $snmpCommand = "snmpget -v2c -c public $host $oid";
+        $snmpCommand = "snmpget -v2c -c LibrenMSPublic $host $oid";
         $response = shell_exec($snmpCommand);
 
         if (!$response) {
