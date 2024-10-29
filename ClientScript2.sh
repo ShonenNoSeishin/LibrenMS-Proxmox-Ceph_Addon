@@ -43,6 +43,8 @@ fi
 cd /opt/
 git clone https://github.com/librenms/librenms-agent.git
 cd librenms-agent
+cp check_mk_agent /usr/bin/check_mk_agent
+chmod +x /usr/bin/check_mk_agent
 mkdir -p /usr/lib/check_mk_agent/local/ /usr/lib/check_mk_agent/plugins
 cp /opt/librenms-agent/agent-local/proxmox /usr/lib/check_mk_agent/local/proxmox
 chmod +x /usr/lib/check_mk_agent/local/proxmox
