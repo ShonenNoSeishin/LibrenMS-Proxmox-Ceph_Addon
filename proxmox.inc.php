@@ -110,7 +110,7 @@ if (! \LibreNMS\Config::get('enable_proxmox')) {
 		          <th style="text-align:center; vertical-align:middle;"><pre>Ceph Bigger<br>Disk Usage</th>
 		          <th style="text-align:center; vertical-align:middle;"><pre>Ceph Snapshots</th>
 		          <th style="text-align:center; vertical-align:middle;"><pre>Ceph Total<br>Snapshots(GiB)</th>
-			  <th style="text-align:center; vertical-align:middle;"><pre>Ceph oldest<br>snapshot(days)</th>
+			  <th style="text-align:center; vertical-align:middle;"><pre>Oldest<br>snapshot(days)</th>
 			  <th style="text-align:center; vertical-align:middle;"><pre>Qemu Info</th>
 		          <th style="text-align:center; vertical-align:middle;"><pre>Network IN</th>
 		          <th style="text-align:center; vertical-align:middle;"><pre>Network OUT</th>
