@@ -54,6 +54,9 @@ You already should have a configured PVE with Ceph (I think it should work witho
 - The default password defined by the scripts for the database is 'Password666'
 - The default community for every snmp instances defined by the script is 'LibrenMSPublic'
 - I've run these scripts with root user
+- If you change the snmp community name, you also have to change it on the following files at the end of the installation :
+
+  -> includes/polling/applications/proxmoxCustom.inc.php
 
 ## Download requirements
 
