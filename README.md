@@ -146,7 +146,6 @@ proxmox:
     - { Field: qemu_info, Type: text, 'Null': true, Extra: '' }
   Indexes:
     PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
-    proxmox_cluster_vmid_unique: { Name: proxmox_cluster_vmid_unique, Columns: [cluster, vmid], Unique: true, Type: BTREE }
 ````
 - in the same file, add this to "devices" section :
 
@@ -419,7 +418,6 @@ proxmox:
     - { Field: qemu_info, Type: text, 'Null': true, Extra: '' }
   Indexes:
     PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
-    proxmox_cluster_vmid_unique: { Name: proxmox_cluster_vmid_unique, Columns: [cluster, vmid], Unique: true, Type: BTREE }
 ````
 
 in the same file, add this line to the "devices" bloc :
@@ -431,7 +429,7 @@ in the same file, add this line to the "devices" bloc :
 Apply changes in the database :
 
 ```bash
-mysql -u root -p<enter the databse password here> -e "Use librenms; ALTER TABLE proxmox ADD name varchar(255) NULL AFTER last_seen, ADD status varchar(50) NULL AFTER name, ADD hostname varchar(255) NULL AFTER vmid, ADD cpu int NULL AFTER status, ADD cpus int NULL AFTER cpu, ADD mem bigint NULL AFTER cpus, ADD maxmem bigint NULL AFTER mem, ADD disk bigint NULL AFTER maxmem, ADD maxdisk bigint NULL AFTER disk, ADD netin bigint NULL AFTER maxdisk, ADD netout bigint NULL AFTER netin, ADD uptime int NULL AFTER netout; ALTER TABLE proxmox MODIFY cluster VARCHAR(255) DEFAULT NULL; ALTER TABLE proxmox CHANGE cluster cluster varchar(255) NOT NULL ; ALTER TABLE proxmox ADD ceph_disks text NULL AFTER uptime; ALTER TABLE proxmox ADD ceph_bigger_disk_percent_usage float NULL AFTER ceph_disks; ALTER TABLE proxmox ADD ceph_snapshots text NULL AFTER ceph_bigger_disk_pourcent_usage; ALTER TABLE proxmox ADD ceph_total_snapshots float NULL AFTER ceph_snapshots; ALTER TABLE proxmox ADD qemu_info text NULL AFTER ceph_total_snapshots; ALTER TABLE proxmox ADD oldest_snapshot int NULL AFTER ceph_total_snapshots; ALTER TABLE devices ADD ceph_state varchar(50) NULL;" && systemctl restart mysql
+mysql -u root -p<enter the databse password here> -e "Use librenms; ALTER TABLE proxmox ADD name varchar(255) NULL AFTER last_seen, ADD status varchar(50) NULL AFTER name, ADD hostname varchar(255) NULL AFTER vmid, ADD cpu int NULL AFTER status, ADD cpus int NULL AFTER cpu, ADD mem bigint NULL AFTER cpus, ADD maxmem bigint NULL AFTER mem, ADD disk bigint NULL AFTER maxmem, ADD maxdisk bigint NULL AFTER disk, ADD netin bigint NULL AFTER maxdisk, ADD netout bigint NULL AFTER netin, ADD uptime int NULL AFTER netout; ALTER TABLE proxmox MODIFY cluster VARCHAR(255) DEFAULT NULL; ALTER TABLE proxmox CHANGE cluster cluster varchar(255) NOT NULL ; ALTER TABLE proxmox ADD ceph_disks text NULL AFTER uptime; ALTER TABLE proxmox ADD ceph_bigger_disk_percent_usage float NULL AFTER ceph_disks; ALTER TABLE proxmox ADD ceph_snapshots text NULL AFTER ceph_bigger_disk_pourcent_usage; ALTER TABLE proxmox ADD ceph_total_snapshots float NULL AFTER ceph_snapshots; ALTER TABLE proxmox ADD qemu_info text NULL AFTER ceph_total_snapshots; ALTER TABLE proxmox ADD oldest_snapshot int NULL AFTER ceph_total_snapshots; ALTER TABLE devices ADD ceph_state varchar(50) NULL; ALTER TABLE proxmox DROP INDEX proxmox_cluster_vmid_unique" && systemctl restart mysql
 ```
 
 ### In the PVE node
