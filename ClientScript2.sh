@@ -51,7 +51,9 @@ cp check_mk_agent /usr/bin/check_mk_agent
 chmod +x /usr/bin/check_mk_agent
 mkdir -p /usr/lib/check_mk_agent/local/ /usr/lib/check_mk_agent/plugins
 cp /opt/librenms-agent/agent-local/proxmox /usr/lib/check_mk_agent/local/proxmox
+cp /opt/librenms-agent/agent-local/ceph /usr/lib/check_mk_agent/local/ceph
 chmod +x /usr/lib/check_mk_agent/local/proxmox
+chmod +x /usr/lib/check_mk_agent/local/ceph
 cp /opt/librenms-agent/check_mk@.service /opt/librenms-agent/check_mk.socket /etc/systemd/system
 systemctl daemon-reload
 systemctl enable check_mk.socket && systemctl start check_mk.socket
