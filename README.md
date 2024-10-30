@@ -173,7 +173,7 @@ To do after :
 
 - add your pve device
 
-  -> After map a PVE device, please go to device and select the new device -> apps -> parameters -> check Proxmox and unix agent
+  -> After map a PVE device, please go to device and select the new device -> apps -> parameters -> check Proxmox and unix agent (and Ceph if you need it)
 
 - force polling and update data
 
