@@ -23,7 +23,7 @@ if ($conn->connect_error) {
 }
 
 // SQL query to retrieve required data from the devices table
-$sql = "SELECT device_id, hostname, hardware, ceph_state FROM devices";
+$sql = "SELECT device_id, hostname, hardware, ceph_state FROM devices WHERE device_id = $device_id";
 $result = $conn->query($sql);
 
 // Check if the query returns any results
