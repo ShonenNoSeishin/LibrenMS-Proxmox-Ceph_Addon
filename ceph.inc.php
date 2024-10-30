@@ -22,6 +22,8 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+$device_id = $vars['device'];
+
 // SQL query to retrieve required data from the devices table
 $sql = "SELECT device_id, hostname, hardware, ceph_state FROM devices WHERE device_id = $device_id";
 $result = $conn->query($sql);
