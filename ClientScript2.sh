@@ -27,9 +27,13 @@ if [[ -z "$PVE_IP" ]]; then
     exit 1
 fi
 
-sudo sed -i "s/^rocommunity public default -V systemonly/rocommunity LibrenMSPublic $LibrenmsIP\nrocommunity LibrenMSPublic 127.0.0.1/" /etc/snmp/snmpd.conf
-# Change community v6
-sudo sed -i 's/public/LibrenMSPublic/' /etc/snmp/snmpd.conf
+sed -i '/^rocommunity /s/^/# /' /etc/snmp/snmpd.conf
+
+# Add new rocommunity lines for LibreNMS IP and localhost
+echo -e "rocommunity LibrenMSPublic $LibrenmsIP\nrocommunity LibrenMSPublic 127.0.0.1" | sudo tee -a /etc/snmp/snmpd.conf > /dev/null
+
+# Update "rocommunity6" to use "LibrenMSPublic" instead of "public"
+sed -i 's/^rocommunity6 public/rocommunity6 LibrenMSPublic/' /etc/snmp/snmpd.conf
 
 echo "agentaddress $PVE_IP" >> /etc/snmp/snmpd.conf
 
