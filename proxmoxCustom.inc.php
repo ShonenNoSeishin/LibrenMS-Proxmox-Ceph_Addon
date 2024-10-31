@@ -70,12 +70,13 @@ if (!function_exists('upsertVm')) {
     function upsertVm($conn, $vm) {
         // escape values to prevent SQL injections
         $hostname = $vm['hostname'];
-	$device_id = (int) $vm['device_id'];
+	    $device_id = (int) $vm['device_id'];
         $vmid = $vm['vmid'];
         $name = $conn->real_escape_string($vm['name']);
         $status = $conn->real_escape_string($vm['status']);
         $cpu = $vm['cpu'];
         $cpus = $vm['cpus'];
+        $cpu_percent = (int) $vm['cpu'] / (int) $vm['cpus'] * 100;
         $mem = $vm['mem'];
         $maxmem = $vm['maxmem'];
         $disk = $vm['disk'];
@@ -107,6 +108,7 @@ if (!function_exists('upsertVm')) {
                     status = '$status',
                     cpu = $cpu,
                     cpus = $cpus,
+                    cpu_percent = $cpu_percent,
                     mem = $mem,
                     maxmem = $maxmem,
                     disk = $disk,
@@ -133,8 +135,8 @@ if (!function_exists('upsertVm')) {
             }
         } else {
             $sqlInsert = "
-                INSERT INTO proxmox (hostname, device_id, vmid, name, status, cpu, cpus, mem, maxmem, disk, maxdisk, netin, netout, uptime, description, cluster, ceph_disks, ceph_bigger_disk_percent_usage, ceph_snapshots, ceph_total_snapshots, qemu_info)
-                VALUES ('$hostname', $device_id, $vmid, '$name', '$status', $cpu, $cpus, $mem, $maxmem, $disk, $maxdisk, $netin, $netout, $uptime, '$description', '$clustername', '$cephDisks', $cephBiggerDiskPercentUsage, '$cephSnapshots', $CephTotalSnapshots, '$qemu_info')
+                INSERT INTO proxmox (hostname, device_id, vmid, name, status, cpu, cpus, cpu_percent, mem, maxmem, disk, maxdisk, netin, netout, uptime, description, cluster, ceph_disks, ceph_bigger_disk_percent_usage, ceph_snapshots, ceph_total_snapshots, qemu_info)
+                VALUES ('$hostname', $device_id, $vmid, '$name', '$status', $cpu, $cpus, $cpu_percent, $mem, $maxmem, $disk, $maxdisk, $netin, $netout, $uptime, '$description', '$clustername', '$cephDisks', $cephBiggerDiskPercentUsage, '$cephSnapshots', $CephTotalSnapshots, '$qemu_info')
             ";
             if ($conn->query($sqlInsert) === TRUE) {
                 echo "VM $name (ID: $vmid) added successfully.\n";
