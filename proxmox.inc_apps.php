@@ -136,6 +136,7 @@ $dbname = getenv('DB_USERNAME');
         <th style="text-align:center; vertical-align:middle;"><pre>VM ID</th>
         <th style="text-align:center; vertical-align:middle;"><pre>Name</th>
         <th style="text-align:center; vertical-align:middle;"><pre>CPU Usage</th>
+	<th style="text-align:center; vertical-align:middle;"><pre>CPU Percent Usage</th>
               <th style="text-align:center; vertical-align:middle;"><pre>Memory Used</th>
               <th style="text-align:center; vertical-align:middle;"><pre>Disk Usage</th>
               <th style="text-align:center; vertical-align:middle;"><pre>Ceph Disks<br>Usage Rate</th>
@@ -162,7 +163,8 @@ $dbname = getenv('DB_USERNAME');
       echo('<td class="' . $statusClass . '" style="text-align:center; vertical-align:middle;"><strong>' . escape_html($vm['status']) . '<strong></td>');
       echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['vmid']) . '</td>');
       echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['name']) . '</td>');
-      echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['cpu'] . ' / ' . $vm['cpus']) . '</td>');
+      echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['cpu']) . ' / ' . escape_html($vm['cpus']) . '</td>');
+      echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['cpu_percent']) . ' %' . '</td>');
       echo('<td style="text-align:center; vertical-align:middle;">' . escape_html(formatBytes($vm['mem']) . ' / ' . formatBytes($vm['maxmem'])) . '</td>');
       echo('<td style="text-align:center; vertical-align:middle;">' . escape_html(formatBytes($vm['disk']) . ' / ' . formatBytes($vm['maxdisk'])) . '</td>');
       echo('<td style="text-align:center; vertical-align:middle;">');
