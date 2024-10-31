@@ -501,6 +501,10 @@ wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Add
 # The script that show PVE informations for a specific device
 rm includes/html/pages/device/apps/proxmox.inc.php
 wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/proxmox.inc.php -O includes/html/pages/device/apps/proxmox.inc.php
+
+# you also need to add an include to add the proxmodCustom in existing proxmox addon, please run this command
+sed -i '1a include "includes/polling/applications/proxmoxCustom.inc.php";' /opt/librenms/includes/polling/applications/proxmox.inc.php
+
 ```
 
 ## Useful commands
