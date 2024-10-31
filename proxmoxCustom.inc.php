@@ -1,5 +1,4 @@
 <?php
-
 $env = file_get_contents("/opt/librenms/.env");
 $lines = explode("\n", $env);
 $hostname = $device['hostname'];
@@ -70,14 +69,14 @@ if (!function_exists('upsertVm')) {
     function upsertVm($conn, $vm) {
         // escape values to prevent SQL injections
         $hostname = $vm['hostname'];
-	    $device_id = (int) $vm['device_id'];
+	$device_id = (int) $vm['device_id'];
         $vmid = $vm['vmid'];
         $name = $conn->real_escape_string($vm['name']);
         $status = $conn->real_escape_string($vm['status']);
         $cpu = $vm['cpu'];
         $cpus = $vm['cpus'];
-        $cpu_percent = (int) $vm['cpu'] / (int) $vm['cpus'] * 100;
-        $mem = $vm['mem'];
+	$cpu_percent = round(((float) $vm['cpu'] / (float) $vm['cpus']) * 100, 3);
+	$mem = $vm['mem'];
         $maxmem = $vm['maxmem'];
         $disk = $vm['disk'];
         $maxdisk = $vm['maxdisk'];
@@ -129,7 +128,7 @@ if (!function_exists('upsertVm')) {
             ";
 
             if ($conn->query($sqlUpdate) === TRUE) {
-                echo "VM $name (ID: $vmid) updated successfully.\n";
+                echo "VM $name (ID: $cpu_percent) updated successfully.\n";
             } else {
                 echo "Error when update VM $name (ID: $vmid): " . $conn->error . "\n";
             }
@@ -193,7 +192,7 @@ if ($result->num_rows > 0) {
                 if ($exists > 0) {
                     $cephInfo = $conn->real_escape_string($vms[0]['cephInfo']);
                     if ($conn->query("UPDATE devices SET ceph_state = '$cephInfo' WHERE device_id = $deviceId") === TRUE) {
-                        echo "VM $name (ID: $deviceId) updated successfully.\n";
+                        echo "VM $name (ID: $vmid) updated successfully.\n";
                     } else {
                         echo "Error updating CephInfo on device: $deviceId : " . $conn->error . "\n";
                     }
