@@ -61,7 +61,8 @@ if [ $? -eq 0 ]; then
   for ELMNT in $(echo "$VM_LIST" | jq -c '.[]'); do
       VMID=$(echo "$ELMNT" | jq -r '.vmid')
       QEMU_INFO=$(/usr/sbin/qm agent $VMID network-get-interfaces 2>/dev/null | jq -r '.[] | ."ip-addresses" | .[] | ."ip-address"')
-      CPU_DATA=$(echo "$CPU_TOTAL_DATA" | jq --arg id "qemu/$VMID" '.[] | select(.id == $id) | ((.cpu * 100 / .maxcpu) * 1000 | round / 1000)')
+      CPU_DATA=$(echo "$CPU_TOTAL_DATA" | jq --arg id "qemu/$VMID" '.[] | select(.id == $id) | .cpu')
+      CPU_PERCENT=$(echo "$CPU_TOTAL_DATA" | jq --arg id "qemu/$VMID" '.[] | select(.id == $id) | ((.cpu * 100 / .maxcpu) * 1000 | round / 1000)')
       CEPH_DISK_INFO=$(echo "$CEPH_TOTAL_INFO" | grep -E "vm-$VMID-disk-*" | grep -v '@')
       ARRAY_DISKS=()
       BIGGER=0
@@ -110,6 +111,7 @@ if [ $? -eq 0 ]; then
       # Modify ELMNT with new values including oldestSnapshot
       UPDATED_ELMNT=$(echo "$ELMNT" | jq \
           --arg cpu "$CPU_DATA" \
+	  --arg cpu_percent "$CPU_PERCENT" \
           --argjson cephDisks "$(printf '%s\n' "${ARRAY_DISKS[@]}" | jq -R . | jq -s .)" \
           --arg cephBiggerDiskPourcentUsage "$(printf '%.2f' $BIGGER)" \
           --arg totalSnapshots "$(printf '%.1f' $TOTAL_SNAPSHOTS)" \
@@ -118,7 +120,7 @@ if [ $? -eq 0 ]; then
           --arg qemuInfo "$QEMU_INFO" \
           --arg cephInfo "$Ceph_Info" \
           --arg oldestSnapshot "$max_days" \
-          '. + {cpu: $cpu, cephDisks: $cephDisks, cephBiggerDiskPourcentUsage: $cephBiggerDiskPourcentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
+          '. + {cpu: $cpu, cpu_percent: $cpu_percent, cephDisks: $cephDisks, cephBiggerDiskPourcentUsage: $cephBiggerDiskPourcentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
 
       UPDATED_VMS+=("$UPDATED_ELMNT")
   done
