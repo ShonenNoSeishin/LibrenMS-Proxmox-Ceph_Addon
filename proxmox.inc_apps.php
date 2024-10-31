@@ -35,6 +35,7 @@ print_optionbar_end();
 $pagetitle[] = 'Proxmox';
 $pagetitle[] = $instance;
 
+/*
 if (isset($vars['vmid'])) {
     include 'includes/html/pages/apps/proxmox/vm.inc.php';
     $pagetitle[] = $vars['vmid'];
@@ -55,8 +56,8 @@ if (isset($vars['vmid'])) {
     </div>
 </div>
 ';
-}
-
+}*/
+include 'includes/html/pages/apps/proxmox/vm.inc.php';
 // START OF FIRST CUSTOM PART
 $env = file_get_contents(__DIR__."/opt/librenms/.env");
 $lines = explode("\n",$env);
@@ -66,7 +67,7 @@ foreach($lines as $line){
   if(isset($matches[2])){
     putenv(trim($line));
   }
-} 
+}
 
 $servername = getenv('DB_HOST');
 $username = getenv('DB_USERNAME');
@@ -152,16 +153,12 @@ $dbname = getenv('DB_USERNAME');
       </thead>
       <tbody>
     ');
-    
-    // Boucle à travers les résultats et affichage des données
+
     while($vm = $result->fetch_assoc()) {
-      // Déterminer la couleur du statut
       $statusClass = $vm['status'] === 'running' ? 'text-success' : 'text-danger';
-      
-      // Affichage des informations pour chaque VM
-      echo('<tr>');
+      $vm_link = generate_link($vm['vmid'], ['page' => 'apps', 'app' => 'proxmox', 'instance' => $vm['cluster'], 'vmid' => $vm['vmid']]) . '</div>';
       echo('<td class="' . $statusClass . '" style="text-align:center; vertical-align:middle;"><strong>' . escape_html($vm['status']) . '<strong></td>');
-      echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['vmid']) . '</td>');
+      echo('<td style="text-align:center; vertical-align:middle;">' . $vm_link . '</td>');
       echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['name']) . '</td>');
       echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['cpu']) . ' / ' . escape_html($vm['cpus']) . '</td>');
       echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['cpu_percent']) . ' %' . '</td>');
@@ -176,7 +173,7 @@ $dbname = getenv('DB_USERNAME');
                 }
             }
             echo('</td>');
-      
+
             echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['ceph_bigger_disk_percent_usage']) . '%</td>');
       
             echo('<td style="text-align:center; vertical-align:middle;">');
@@ -207,3 +204,4 @@ $dbname = getenv('DB_USERNAME');
 
 	$conn->close();
 // END OF FIRST CUSTOM PART
+
