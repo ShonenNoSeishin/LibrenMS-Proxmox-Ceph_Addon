@@ -133,14 +133,14 @@ fi
             --arg cpu "$CPU_DATA" \
             --arg cpu_percent "$CPU_PERCENT" \
             --argjson cephDisks "$(printf '%s\n' "${ARRAY_DISKS[@]}" | jq -R . | jq -s .)" \
-            --arg cephBiggerDiskPourcentUsage "$(printf '%.2f' $BIGGER)" \
+            --arg cephBiggerDiskPercentUsage "$(printf '%.2f' $BIGGER)" \
             --arg totalSnapshots "$(printf '%.1f' $TOTAL_SNAPSHOTS)" \
             --argjson cephSnapshots "$(printf '%s\n' "${ARRAY_SNAPSHOTS[@]}" | jq -R . | jq -s .)" \
             --arg clustername "$clustername" \
             --arg qemuInfo "$QEMU_INFO" \
             --arg cephInfo "$Ceph_Info" \
             --arg oldestSnapshot "$max_days" \
-            '. + {cpu: $cpu, cpu_percent: $cpu_percent, cephDisks: $cephDisks, cephBiggerDiskPourcentUsage: $cephBiggerDiskPourcentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
+            '. + {cpu: $cpu, cpu_percent: $cpu_percent, cephDisks: $cephDisks, cephBiggerDiskPercentUsage: $cephBiggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
 
         UPDATED_VMS+=("$UPDATED_ELMNT")
     done
