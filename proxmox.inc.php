@@ -93,82 +93,138 @@ if (! \LibreNMS\Config::get('enable_proxmox')) {
 		return '</div></div>';
 	}
 
-	if ($result->num_rows > 0) {
-		echo('<table class="table table-condensed table-striped table-hover">');
+    echo '
+    <form method="POST" id="column-selector">
+        <input type="hidden" name="_token" value="' . csrf_token() . '">
+        <label><input type="checkbox" name="columns[]" value="state" checked' . (in_array('state', $_POST['columns'] ?? []) ? 'checked' : '') . '> State</label>
+        <label><input type="checkbox" name="columns[]" value="vmid" checked' . (in_array('vmid', $_POST['columns'] ?? []) ? 'checked' : '') . '> VM ID</label>
+        <label><input type="checkbox" name="columns[]" value="name" checked' . (in_array('name', $_POST['columns'] ?? []) ? 'checked' : '') . '> Name</label>
+        <label><input type="checkbox" name="columns[]" value="cpu_usage" checked' . (in_array('cpu_usage', $_POST['columns'] ?? []) ? 'checked' : '') . '> CPU Usage</label>
+        <label><input type="checkbox" name="columns[]" value="cpu_percent" checked' . (in_array('cpu_percent', $_POST['columns'] ?? []) ? 'checked' : '') . '> CPU Percent Usage</label>
+        <label><input type="checkbox" name="columns[]" value="mem_usage" checked' . (in_array('mem_usage', $_POST['columns'] ?? []) ? 'checked' : '') . '> Memory Used</label>
+        <label><input type="checkbox" name="columns[]" value="disk_usage" checked' . (in_array('disk_usage', $_POST['columns'] ?? []) ? 'checked' : '') . '> Disk Usage</label>
+        <label><input type="checkbox" name="columns[]" value="ceph_disks" checked' . (in_array('ceph_disks', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Disks Usage Rate</label>
+        <label><input type="checkbox" name="columns[]" value="ceph_bigger_disk" checked' . (in_array('ceph_bigger_disk', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Bigger Disk Usage</label>
+        <label><input type="checkbox" name="columns[]" value="ceph_snapshots" checked' . (in_array('ceph_snapshots', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Snapshots</label>
+        <label><input type="checkbox" name="columns[]" value="total_snapshots" checked' . (in_array('total_snapshots', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Total Snapshots</label>
+        <label><input type="checkbox" name="columns[]" value="oldest_snapshot" checked' . (in_array('oldest_snapshot', $_POST['columns'] ?? []) ? 'checked' : '') . '> Oldest Snapshot</label>
+        <label><input type="checkbox" name="columns[]" value="qemu_info" checked' . (in_array('qemu_info', $_POST['columns'] ?? []) ? 'checked' : '') . '> Qemu Info</label>
+        <label><input type="checkbox" name="columns[]" value="network_in" checked' . (in_array('network_in', $_POST['columns'] ?? []) ? 'checked' : '') . '> Network IN</label>
+        <label><input type="checkbox" name="columns[]" value="network_out" checked' . (in_array('network_out', $_POST['columns'] ?? []) ? 'checked' : '') . '> Network OUT</label>
+        <label><input type="checkbox" name="columns[]" value="uptime" checked' . (in_array('uptime', $_POST['columns'] ?? []) ? 'checked' : '') . '> Uptime</label>
+    <button type="submit" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+        Apply
+    </button>
+    </form>
+    ';
 
-		// En-tête du tableau
-		echo('
-		  <thead style="text-align:center; vertical-align:middle;">
-			<tr style="text-align:center; vertical-align:middle;">
-			  <th style="text-align:center; vertical-align:middle;"><pre>State</th>
-			  <th style="text-align:center; vertical-align:middle;"><pre>VM ID</th>
-			  <th style="text-align:center; vertical-align:middle;"><pre>Name</th>
-			  <th style="text-align:center; vertical-align:middle;"><pre>CPU Usage</th>
-     			  <th style="text-align:center; vertical-align:middle;"><pre>CPU Percent Usage</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Memory Used</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Disk Usage</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Ceph Disks<br>Usage Rate</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Ceph Bigger<br>Disk Usage</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Ceph Snapshots</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Ceph Total<br>Snapshots(GiB)</th>
-			  <th style="text-align:center; vertical-align:middle;"><pre>Oldest<br>snapshot(days)</th>
-			  <th style="text-align:center; vertical-align:middle;"><pre>Qemu Info</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Network IN</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Network OUT</th>
-		          <th style="text-align:center; vertical-align:middle;"><pre>Uptime</th>
-			</tr>
-		  </thead>
-		  <tbody>
-		');
+    $available_columns = [
+        'state' => 'State',
+        'vmid' => 'VM ID',
+        'name' => 'Name',
+        'cpu_usage' => 'CPU Usage',
+        'cpu_percent' => 'CPU Percent Usage',
+        'mem_usage' => 'Memory Used',
+        'disk_usage' => 'Disk Usage',
+        'ceph_disks' => 'Ceph Disks<br>Usage Rate',
+        'ceph_bigger_disk' => 'Ceph Bigger<br>Disk Usage',
+        'ceph_snapshots' => 'Ceph Snapshots',
+        'total_snapshots' => 'Ceph Total<br>Snapshots(GiB)',
+        'oldest_snapshot' => 'Oldest<br>snapshot(days)',
+        'qemu_info' => 'Qemu Info',
+        'network_in' => 'Network IN',
+        'network_out' => 'Network OUT',
+        'uptime' => 'Uptime'
+    ];
 
-		while($vm = $result->fetch_assoc()) {
-			$statusClass = $vm['status'] === 'running' ? 'text-success' : 'text-danger';
-			
-			echo('<tr>');
-			echo('<td class="' . $statusClass . '" style="text-align:center; vertical-align:middle;"><strong>' . escape_html($vm['status']) . '<strong></td>');
-			echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['vmid']) . '</td>');
-			echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['name']) . '</td>');
-			echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['cpu']) . ' / ' . escape_html($vm['cpus']) . '</td>');
-                        echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['cpu_percent']) . ' %' . '</td>');
-			echo('<td style="text-align:center; vertical-align:middle;">' . escape_html(formatBytes($vm['mem']) . ' / ' . formatBytes($vm['maxmem'])) . '</td>');
-			echo('<td style="text-align:center; vertical-align:middle;">' . escape_html(formatBytes($vm['disk']) . ' / ' . formatBytes($vm['maxdisk'])) . '</td>');
-      			echo('<td style="text-align:center; vertical-align:middle;">');
-			$ceph_disks = unserialize($vm['ceph_disks']);
-		        if (is_array($ceph_disks)) {
-	        	        foreach ($ceph_disks as $disk) {
-					$clean_disk = preg_replace('/vm-\d+-/', '', $disk);
-			                echo escape_html($clean_disk) . '<br>';
-          			}
-      			}
-		        echo('</td>');
-      
-		        echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['ceph_bigger_disk_percent_usage']) . '%</td>');
-      
-		        echo('<td style="text-align:center; vertical-align:middle;">');
-		        $ceph_snapshots = unserialize($vm['ceph_snapshots']);
-		        if (is_array($ceph_snapshots)) {
-		            foreach ($ceph_snapshots as $snapshot) {
-			    	$clean_snap = preg_replace('/vm-\d+-state-/', '', $snapshot);
-			        echo escape_html($clean_snap) . '<br>';              		    
-          	  	    }
-      		        }
-		        echo('</td>');
-		        echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['ceph_total_snapshots']) . '</td>');
-			echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['oldest_snapshot']) . '</td>');
-		        echo('<td style="text-align:center; vertical-align:middle;">' . escape_html($vm['qemu_info']) . '</td>');
-		        echo('<td style="text-align:center; vertical-align:middle;">' . escape_html(formatBytes($vm['netin'])) . '</td>');
-		        echo('<td style="text-align:center; vertical-align:middle;">' . escape_html(formatBytes($vm['netout'])) . '</td>');
-		        echo('<td style="text-align:center; vertical-align:middle;">' . escape_html(formatUptime($vm['uptime'])) . '</td>');
-		        echo('</tr>');
-			echo('</tr>');
-		}
+    $selected_columns = $_POST['columns'] ?? array_keys($available_columns);
 
-		echo('</tbody></table>');
-		echo generate_box_close();
+    if ($result->num_rows > 0) {
+        echo '<table class="table table-condensed table-striped table-hover">';
 
-	} else {
-		echo "No virtual machines found.";
-	}
+        echo '<thead style="text-align:center; vertical-align:middle;"><tr style="text-align:center; vertical-align:middle;">';
+        foreach ($selected_columns as $col) {
+            if (isset($available_columns[$col])) {
+                echo '<th style="text-align:center; vertical-align:middle;"><pre>' . $available_columns[$col] . '</pre></th>';
+            }
+        }
+        echo '</tr></thead><tbody>';
+
+        while ($vm = $result->fetch_assoc()) {
+            echo '<tr>';
+            foreach ($selected_columns as $col) {
+                echo '<td style="text-align:center; vertical-align:middle;">';
+                switch ($col) {
+                    case 'state':
+                        $statusClass = $vm['status'] === 'running' ? 'text-success' : 'text-danger';
+                        echo '<strong class="' . $statusClass . '">' . escape_html($vm['status']) . '</strong>';
+                        break;
+                    case 'vmid':
+                        echo escape_html($vm['vmid']);
+                        break;
+                    case 'name':
+                        echo escape_html($vm['name']);
+                        break;
+                    case 'cpu_usage':
+                        echo escape_html($vm['cpu']) . ' / ' . escape_html($vm['cpus']);
+                        break;
+                    case 'cpu_percent':
+                        echo escape_html($vm['cpu_percent']) . ' %';
+                        break;
+                    case 'mem_usage':
+                        echo escape_html(formatBytes($vm['mem'])) . ' / ' . escape_html(formatBytes($vm['maxmem']));
+                        break;
+                    case 'disk_usage':
+                        echo escape_html(formatBytes($vm['disk'])) . ' / ' . escape_html(formatBytes($vm['maxdisk']));
+                        break;
+                    case 'ceph_disks':
+                        $ceph_disks = unserialize($vm['ceph_disks']);
+                        if (is_array($ceph_disks)) {
+                            foreach ($ceph_disks as $disk) {
+                                echo escape_html(preg_replace('/vm-\d+-/', '', $disk)) . '<br>';
+                            }
+                        }
+                        break;
+                    case 'ceph_bigger_disk':
+                        echo escape_html($vm['ceph_bigger_disk_percent_usage']) . '%';
+                        break;
+                    case 'ceph_snapshots':
+                        $ceph_snapshots = unserialize($vm['ceph_snapshots']);
+                        if (is_array($ceph_snapshots)) {
+                            foreach ($ceph_snapshots as $snapshot) {
+                                echo escape_html(preg_replace('/vm-\d+-state-/', '', $snapshot)) . '<br>';
+                            }
+                        }
+                        break;
+                    case 'total_snapshots':
+                        echo escape_html($vm['ceph_total_snapshots']);
+                        break;
+                    case 'oldest_snapshot':
+                        echo escape_html($vm['oldest_snapshot']);
+                        break;
+                    case 'qemu_info':
+                        echo escape_html($vm['qemu_info']);
+                        break;
+                    case 'network_in':
+                        echo escape_html(formatBytes($vm['netin']));
+                        break;
+                    case 'network_out':
+                        echo escape_html(formatBytes($vm['netout']));
+                        break;
+                    case 'uptime':
+                        echo escape_html(formatUptime($vm['uptime']));
+                        break;
+                }
+                echo '</td>';
+            }
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
+    } else {
+        echo 'No virtual machines found.';
+    }
+
+
 
 	$conn->close();
 	// END OF SECOND CUSTOM PART
