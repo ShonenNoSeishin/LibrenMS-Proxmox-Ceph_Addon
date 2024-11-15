@@ -10,7 +10,7 @@ if [[ -z "$syslog_ip" ]]; then
 fi
 
 # Add the syslog configuration line to /etc/rsyslog.conf
-echo "*.* @@$syslog_ip:514" | sudo tee -a /etc/rsyslog.conf > /dev/null
+echo "*.* @$syslog_ip:514" | sudo tee -a /etc/rsyslog.conf > /dev/null
 
 # Reload rsyslog service to apply the changes
 sudo systemctl restart rsyslog
