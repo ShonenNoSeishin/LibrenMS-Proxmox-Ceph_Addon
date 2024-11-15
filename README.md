@@ -539,3 +539,29 @@ sudo -u librenms /opt/librenms/validate.php
 ### Alerting by email
 
 I followed this documentation -> https://ws.learn.ac.lk/wiki/NSM2021/Agenda/AlertsLibrenms
+
+## Logging
+
+It's also possible to send logs from PVE to LibrenMS. Unlike the LibrenMS doc for activating syslog-ng, I do not put the "flags(syslog-protocol)" filter for the source of the flow, because otherwise, logs which do not have the format in question will not are not taken into account (VM state change logs, backup, etc.)
+
+I made two scripts to make this configuration easier. 
+
+On LibrenMS machine : 
+
+`````bash
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/Configure_Syslog_LNMS.sh -O ./Configure_Syslog_LNMS.sh
+chmod +x ./Configure_Syslog_LNMS.sh
+./Configure_Syslog_LNMS.sh
+`````
+
+And then on the PVE machine : 
+
+`````bash
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/Configure_Syslog_PVE.sh -O ./Configure_Syslog_PVE.sh
+chmod +x ./Configure_Syslog_PVE.sh
+./Configure_Syslog_PVE.sh
+`````
+
+After that, you should be able to see the node logs in the LibrenMS machine view :
+
+![image](https://github.com/user-attachments/assets/c11ab6d4-afff-43b0-9e02-12db6f9e9e73)
