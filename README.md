@@ -148,6 +148,13 @@ proxmox:
   Indexes:
     PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
 ````
+
+Note that you should delete the following line because if you have more then one cluster, it's possible to have some VMs with the same VMID : 
+
+````bash
+`  - proxmox_cluster_vmid_unique: { Name: proxmox_cluster_vmid_unique, Columns: [cluster, vmid], Unique: true, Type: BTREE }
+````
+
 - in the same file, add this to "devices" section :
 
 ````bash
