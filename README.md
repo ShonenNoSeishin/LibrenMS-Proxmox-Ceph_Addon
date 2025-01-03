@@ -90,7 +90,7 @@ To do after :
 
     => timezone Mysql
 
-        => mysql -u root -p -e "SET GLOBAL time_zone = '+02:00';" && timedatectl set-timezone Europe/Brussels
+        => mysql -u root -p -e "SET GLOBAL time_zone = '+02:00';" && timedatectl set-timezone Europe/Brussels && systemctl restart mysql
 
     => timezone PHP
 
