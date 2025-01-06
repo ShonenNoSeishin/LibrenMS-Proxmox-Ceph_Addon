@@ -76,6 +76,9 @@ echo "\$config['enable_proxmox'] = 1;" >> /opt/librenms/config.php
 wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/returnPveInfo.sh -O /usr/lib/returnPveInfo.sh
 wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/customPVE.sh -O /usr/lib/check_mk_agent/local/customPVE.sh
 
+read -p "Entrez le nouveau nom du Ceph Pool : " NewCephPoolName && \
+sed -i "s/\$CephPoolName=\"[^\"]*\"/\$CephPoolName=\"$NewCephPoolName\"/" /usr/lib/returnPveInfo.sh
+
 # Make them executable : 
 chmod +x /usr/lib/check_mk_agent/local/customPVE.sh
 chmod +x /usr/lib/returnPveInfo.sh
