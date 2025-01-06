@@ -2,7 +2,7 @@
 # Proxmox VE virtual machine listing
 # (c) 2015-2019, Tom Laermans for Observium
 
-$CephPoolName="MyCephPoolName"
+CephPoolName="MyCephPoolName"
 
 # Verify if returnPveInfo script is already running
 another_instance() {
