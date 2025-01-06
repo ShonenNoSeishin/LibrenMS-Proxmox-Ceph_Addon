@@ -2,6 +2,8 @@
 # Proxmox VE virtual machine listing
 # (c) 2015-2019, Tom Laermans for Observium
 
+$CephPoolName="MyCephPoolName"
+
 # Verify if returnPveInfo script is already running
 another_instance() {
     echo "Fill Cache is running already." >>/var/log/fill-cache.log
@@ -61,7 +63,7 @@ if command -v ceph >/dev/null 2>&1; then
         fi
 
         ceph_status=$Ceph_Info
-        CEPH_TOTAL_INFO=$(rbd du -p CephPool 2>/dev/null || echo "null")
+        CEPH_TOTAL_INFO=$(rbd du -p $CephPoolName 2>/dev/null || echo "null")
     fi
 else
     # Set Ceph-related variables to null if Ceph is not installed
