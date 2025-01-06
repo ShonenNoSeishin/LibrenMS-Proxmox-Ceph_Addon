@@ -5,7 +5,8 @@
 
 if [ $(wc -l < "/usr/lib/PVE_INFO.txt") -le 2 ]; then
     # If the file contains less then 3 lines, it exec the script to full the txt file
-    /usr/lib/customPVE.sh
+    /usr/lib/returnPveInfo.sh
+    #/usr/lib/customPVE.sh
 fi
 
 cat /usr/lib/PVE_INFO.txt
