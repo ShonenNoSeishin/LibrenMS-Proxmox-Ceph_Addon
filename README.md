@@ -118,6 +118,7 @@ To do after :
 - modify /opt/librenms/misc/db_schema.yaml file on the LibrenMS machine to make the proxmox part similar
 
 ````bash
+
 proxmox:
   Columns:
     - { Field: id, Type: 'int unsigned', 'Null': false, Extra: auto_increment }
@@ -134,13 +135,11 @@ proxmox:
     - { Field: cpu_percent, Type: float, 'Null': true, Extra: '' }
     - { Field: mem, Type: bigint, 'Null': true, Extra: '' }
     - { Field: maxmem, Type: bigint, 'Null': true, Extra: '' }
-    - { Field: disk, Type: bigint, 'Null': true, Extra: '' }
-    - { Field: maxdisk, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: disk, Type: text, 'Null': true, Extra: '' }
     - { Field: netin, Type: bigint, 'Null': true, Extra: '' }
     - { Field: netout, Type: bigint, 'Null': true, Extra: '' }
     - { Field: uptime, Type: 'int', 'Null': true, Extra: '' }
-    - { Field: ceph_disks, Type: text, 'Null': true, Extra: '' }
-    - { Field: ceph_bigger_disk_percent_usage, Type: float, 'Null': true, Extra: '' }
+    - { Field: bigger_disk_percent_usage, Type: float, 'Null': true, Extra: '' }
     - { Field: ceph_snapshots, Type: text, 'Null': true, Extra: '' }
     - { Field: ceph_total_snapshots, Type: float, 'Null': true, Extra: '' }
     - { Field: oldest_snapshot, Type: int, 'Null': true, Extra: '' }
