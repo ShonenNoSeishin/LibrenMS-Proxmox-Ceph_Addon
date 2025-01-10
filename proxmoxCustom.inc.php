@@ -78,13 +78,14 @@ if (!function_exists('upsertVm')) {
 	$cpu_percent = round(((float) $vm['cpu'] / (float) $vm['cpus']) * 100, 3);
 	$mem = $vm['mem'];
         $maxmem = $vm['maxmem'];
-        $disk = $vm['disk'];
-        $maxdisk = $vm['maxdisk'];
+        $disk = $conn->real_escape_string(serialize($vm['disk']));
+//        $maxdisk = $vm['maxdisk'];
         $netin = $vm['netin'];
         $netout = $vm['netout'];
         $uptime = $vm['uptime'];
-        $cephDisks = $conn->real_escape_string(serialize($vm['cephDisks']));
-        $cephBiggerDiskPercentUsage = floatval($vm['cephBiggerDiskPercentUsage']);
+//        $cephDisks = $conn->real_escape_string(serialize($vm['cephDisks']));
+//        $cephBiggerDiskPercentUsage = floatval($vm['cephBiggerDiskPercentUsage']);
+        $biggerDiskPercentUsage = floatval($vm['biggerDiskPercentUsage']);
         $cephSnapshots = $conn->real_escape_string(serialize($vm['cephSnapshots']));
         $CephTotalSnapshots = floatval($vm['CephTotalSnapshots']);
         $clustername = $vm['clustername'];
@@ -96,6 +97,11 @@ if (!function_exists('upsertVm')) {
         $sqlCheckExists = "SELECT COUNT(*) FROM proxmox WHERE vmid = $vmid AND device_id = $device_id";
         $result = $conn->query($sqlCheckExists);
         $exists = $result->fetch_row()[0];
+
+//                    ceph_disks = \"$cephDisks\",
+//                    maxdisk = $maxdisk,
+
+
 
         if ($exists > 0) {
             $sqlUpdate = "
@@ -110,13 +116,14 @@ if (!function_exists('upsertVm')) {
                     cpu_percent = $cpu_percent,
                     mem = $mem,
                     maxmem = $maxmem,
-                    disk = $disk,
-                    maxdisk = $maxdisk,
+ 		    disk = CASE 
+			WHEN ('$disk' = 'a:1:{i:0;s:0:\"\";}') AND '$status' = 'stopped' THEN disk
+			ELSE \"$disk\"
+			END,
                     netin = $netin,
                     netout = $netout,
                     uptime = $uptime,
-                    ceph_disks = \"$cephDisks\",
-                    ceph_bigger_disk_percent_usage = $cephBiggerDiskPercentUsage,
+                    bigger_disk_percent_usage = $biggerDiskPercentUsage,
                     ceph_snapshots = \"$cephSnapshots\",
                     ceph_total_snapshots = $CephTotalSnapshots,
                     cluster = '$clustername',
@@ -134,8 +141,8 @@ if (!function_exists('upsertVm')) {
             }
         } else {
             $sqlInsert = "
-                INSERT INTO proxmox (hostname, device_id, vmid, name, status, cpu, cpus, cpu_percent, mem, maxmem, disk, maxdisk, netin, netout, uptime, description, cluster, ceph_disks, ceph_bigger_disk_percent_usage, ceph_snapshots, ceph_total_snapshots, qemu_info)
-                VALUES ('$hostname', $device_id, $vmid, '$name', '$status', $cpu, $cpus, $cpu_percent, $mem, $maxmem, $disk, $maxdisk, $netin, $netout, $uptime, '$description', '$clustername', '$cephDisks', $cephBiggerDiskPercentUsage, '$cephSnapshots', $CephTotalSnapshots, '$qemu_info')
+                INSERT INTO proxmox (hostname, device_id, vmid, name, status, cpu, cpus, cpu_percent, mem, maxmem, disk, netin, netout, uptime, description, cluster, bigger_disk_percent_usage, ceph_snapshots, ceph_total_snapshots, qemu_info)
+                VALUES ('$hostname', $device_id, $vmid, '$name', '$status', $cpu, $cpus, $cpu_percent, $mem, $maxmem, $disk, $netin, $netout, $uptime, '$description', '$clustername', $biggerDiskPercentUsage, '$cephSnapshots', $CephTotalSnapshots, '$qemu_info')
             ";
             if ($conn->query($sqlInsert) === TRUE) {
                 echo "VM $name (ID: $vmid) added successfully.\n";
