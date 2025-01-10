@@ -128,6 +128,10 @@ $dbname = getenv('DB_USERNAME');
 		return '</div></div>';  
 	}
 
+//        <label><input type="checkbox" name="columns[]" value="ceph_disks" checked' . (in_array('ceph_disks', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Disks Usage Rate</label>
+//        <label><input type="checkbox" name="columns[]" value="ceph_bigger_disk" checked' . (in_array('ceph_bigger_disk', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Bigger Disk Usage</label>
+
+
     echo '
     <form method="POST" id="column-selector">
         <input type="hidden" name="_token" value="' . csrf_token() . '">
@@ -137,9 +141,8 @@ $dbname = getenv('DB_USERNAME');
         <label><input type="checkbox" name="columns[]" value="cpu_usage" checked' . (in_array('cpu_usage', $_POST['columns'] ?? []) ? 'checked' : '') . '> CPU Usage</label>
         <label><input type="checkbox" name="columns[]" value="cpu_percent" checked' . (in_array('cpu_percent', $_POST['columns'] ?? []) ? 'checked' : '') . '> CPU Percent Usage</label>
         <label><input type="checkbox" name="columns[]" value="mem_usage" checked' . (in_array('mem_usage', $_POST['columns'] ?? []) ? 'checked' : '') . '> Memory Used</label>
-        <label><input type="checkbox" name="columns[]" value="disk_usage" checked' . (in_array('disk_usage', $_POST['columns'] ?? []) ? 'checked' : '') . '> Disk Usage</label>
-        <label><input type="checkbox" name="columns[]" value="ceph_disks" checked' . (in_array('ceph_disks', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Disks Usage Rate</label>
-        <label><input type="checkbox" name="columns[]" value="ceph_bigger_disk" checked' . (in_array('ceph_bigger_disk', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Bigger Disk Usage</label>
+        <label><input type="checkbox" name="columns[]" value="disk_usage" checked' . (in_array('disk_usage', $_POST['columns'] ?? []) ? 'checked' : '') . '> Disks Usage</label>
+        <label><input type="checkbox" name="columns[]" value="bigger_disk" checked' . (in_array('bigger_disk', $_POST['columns'] ?? []) ? 'checked' : '') . '> Bigger Disk Usage</label>
         <label><input type="checkbox" name="columns[]" value="ceph_snapshots" checked' . (in_array('ceph_snapshots', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Snapshots</label>
         <label><input type="checkbox" name="columns[]" value="total_snapshots" checked' . (in_array('total_snapshots', $_POST['columns'] ?? []) ? 'checked' : '') . '> Ceph Total Snapshots</label>
         <label><input type="checkbox" name="columns[]" value="oldest_snapshot" checked' . (in_array('oldest_snapshot', $_POST['columns'] ?? []) ? 'checked' : '') . '> Oldest Snapshot</label>
@@ -153,6 +156,7 @@ $dbname = getenv('DB_USERNAME');
     </form>
     ';
 
+
     $available_columns = [
         'state' => 'State',
         'vmid' => 'VM ID',
@@ -161,8 +165,9 @@ $dbname = getenv('DB_USERNAME');
         'cpu_percent' => 'CPU Percent Usage',
         'mem_usage' => 'Memory Used',
         'disk_usage' => 'Disk Usage',
-        'ceph_disks' => 'Ceph Disks<br>Usage Rate',
-        'ceph_bigger_disk' => 'Ceph Bigger<br>Disk Usage',
+//        'ceph_disks' => 'Ceph Disks<br>Usage Rate',
+//        'ceph_bigger_disk' => 'Ceph Bigger<br>Disk Usage',
+        'bigger_disk' => 'Bigger<br>Disk Usage',
         'ceph_snapshots' => 'Ceph Snapshots',
         'total_snapshots' => 'Ceph Total<br>Snapshots(GiB)',
         'oldest_snapshot' => 'Oldest<br>snapshot(days)',
@@ -210,18 +215,15 @@ $dbname = getenv('DB_USERNAME');
                         echo escape_html(formatBytes($vm['mem'])) . ' / ' . escape_html(formatBytes($vm['maxmem']));
                         break;
                     case 'disk_usage':
-                        echo escape_html(formatBytes($vm['disk'])) . ' / ' . escape_html(formatBytes($vm['maxdisk']));
-                        break;
-                    case 'ceph_disks':
-                        $ceph_disks = unserialize($vm['ceph_disks']);
-                        if (is_array($ceph_disks)) {
-                            foreach ($ceph_disks as $disk) {
+                        $disks = unserialize($vm['disk']);
+                        if (is_array($disks)) {
+                            foreach ($disks as $disk) {
                                 echo escape_html(preg_replace('/vm-\d+-/', '', $disk)) . '<br>';
                             }
                         }
                         break;
-                    case 'ceph_bigger_disk':
-                        echo escape_html($vm['ceph_bigger_disk_percent_usage']) . '%';
+                    case 'bigger_disk':
+                        echo escape_html($vm['bigger_disk_percent_usage']) . '%';
                         break;
                     case 'ceph_snapshots':
                         $ceph_snapshots = unserialize($vm['ceph_snapshots']);
