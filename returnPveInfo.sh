@@ -2,7 +2,7 @@
 # Proxmox VE virtual machine listing
 # (c) 2015-2019, Tom Laermans for Observium
 
-CephPoolName="MyCephPoolName"
+CephPoolName="Pool-Replica-3"
 
 # Verify if returnPveInfo script is already running
 another_instance() {
@@ -29,9 +29,9 @@ if [ $? -eq 0 ]; then
     ceph_data=""
     Ceph_Info="null"
     ceph_status="null"
-    ceph_disks="null"
+    disks="null"
     ceph_snapshots="null"
-    cephBiggerDiskPourcentUsage="null"
+    biggerDiskPourcentUsage="null"
     CephTotalSnapshots="null"
 
 if command -v ceph >/dev/null 2>&1; then
@@ -63,15 +63,15 @@ if command -v ceph >/dev/null 2>&1; then
         fi
 
         ceph_status=$Ceph_Info
-        CEPH_TOTAL_INFO=$(rbd du -p $CephPoolName 2>/dev/null || echo "null")
+        CEPH_TOTAL_INFO=$(rbd du -p "$CephPoolName" 2>/dev/null || echo "null")
     fi
 else
     # Set Ceph-related variables to null if Ceph is not installed
     Ceph_Info="null"
     ceph_status="null"
-    ceph_disks="null"
+    disks="null"
     ceph_snapshots="null"
-    cephBiggerDiskPourcentUsage="null"
+#    biggerDiskPourcentUsage="null"
     CephTotalSnapshots="null"
     echo "Ceph is not installed; setting Ceph data to null."
 fi
@@ -104,45 +104,88 @@ fi
             fi
         done <<< "$snapshots"
 
-        if command -v ceph >/dev/null 2>&1; then
-            CEPH_DISK_INFO=$(echo "$CEPH_TOTAL_INFO" | grep -E "vm-$VMID-disk-*" | grep -v '@')
-            while read -r name size sizeUnit used usedUnit; do
-                if [[ -n "$name" ]]; then
-                    size_num=$(echo "$size" | sed 's/[^0-9.]//g')
-                    used_num=$(echo "$used" | sed 's/[^0-9.]//g')
-                    POURCENT=$(awk "BEGIN {print ($used_num/$size_num) * 100}")
+        # Récupération des informations CEPH et disque
+        CEPH_DISK_INFO=$(echo "$CEPH_TOTAL_INFO" | grep -E "vm-$VMID-disk-*" | grep -v '@')
+        DISK_INFO=$(pvesh get /nodes/$(hostname)/qemu/$VMID/agent/get-fsinfo --output-format json | jq -r '
+            .result[] | 
+            select(.["used-bytes"] != null and .["total-bytes"] != null) | 
+            "\(.mountpoint) \(.["used-bytes"] / 1024 / 1024 / 1024) GiB \(.["total-bytes"] / 1024 / 1024 / 1024) GiB"
+        ')
+
+        BIGGER=0
+        max_disk=0
+        used_disk=0
+	if [[ "$DISK_INFO" != *"QEMU guest agent is not running"* && "$DISK_INFO" != *"is not running"* && "$DISK_INFO" != *"No QEMU guest agent configured"* ]]; then            
+            while read -r disk_name GiB_used used_unit GiB_size size_unit; do
+                if [[ -n "$disk_name" ]]; then
+                    max_disk=$(echo "$GiB_size" | sed 's/[^0-9.]//g')
+                    used_disk=$(echo "$GiB_used" | sed 's/[^0-9.]//g')
+                    
+		    POURCENT=0
+
+		    if [[ -n "$used_disk" ]] && (( $(awk "BEGIN {print ($max_disk != 0)}") )); then
+                        POURCENT=$(awk "BEGIN {print ($used_disk / $max_disk) * 100}")
+			echo "YES" >> /tmp/debug.log
+                    else
+                        POURCENT=0
+                    fi
+#		    echo "DEBUG: disk_name=$disk_name used_disk=$used_disk max_disk=$max_disk POURCENT=$POURCENT" >> /tmp/debug.log		    
                     if (( $(echo "$BIGGER < $POURCENT" | bc -l) )); then
                         BIGGER=$POURCENT
                     fi
-                    ARRAY_DISKS+=("$name : $used_num / $size_num $sizeUnit")
+#                    echo "DEBUG: BIGGER=$BIGGER" >> /tmp/debug.log
+		    used_disk_rounded=$(printf "%.2f" "$used_disk")
+		    max_disk_rounded=$(printf "%.2f" "$max_disk")
+                    ARRAY_DISKS+=("$disk_name : $used_disk_rounded / $max_disk_rounded $size_unit")
+#		    ARRAY_DISKS+=("$disk_name : $used_disk / $max_disk $size_unit")
                 fi
-            done <<< "$CEPH_DISK_INFO"
-            CEPH_SNAPSHOTS=$(echo "$CEPH_TOTAL_INFO" | grep "vm-$VMID-state")
+            done <<< "$DISK_INFO"
+       fi
+
+            CEPH_SNAPSHOTS=$(echo "$CEPH_TOTAL_INFO" | grep "vm-$VMID-disk-.*@")
             TOTAL_SNAPSHOTS=0
             ARRAY_SNAPSHOTS=()
             while read -r name size sizeUnit used usedUnit; do
                 if [[ -n "$name" ]]; then
-                    size_num=$(echo "$size" | sed 's/[^0-9.]//g')
-                    used_num=$(echo "$used" | sed 's/[^0-9.]//g')
-                    TOTAL_SNAPSHOTS=$(awk "BEGIN {print $TOTAL_SNAPSHOTS + $used_num}")
-                    ARRAY_SNAPSHOTS+=("$name : $size_num $sizeUnit")
+			size_num=$(echo "$size" | sed 's/[^0-9.]//g')
+			used_num=$(echo "$used" | sed 's/[^0-9.]//g')
+
+			# Convert to GiB
+			case $usedUnit in
+			    "GiB")
+			        used_gib=$used_num
+			        ;;
+			    "MiB")
+			        used_gib=$(awk "BEGIN {print $used_num / 1024}")
+			        ;;
+			    "KiB")
+			        used_gib=$(awk "BEGIN {print $used_num / 1024 / 1024}")
+			        ;;
+			esac
+
+			TOTAL_SNAPSHOTS=$(awk "BEGIN {print $TOTAL_SNAPSHOTS + $used_gib}")
+			ARRAY_SNAPSHOTS+=("$name : $used_num $usedUnit / $size_num $sizeUnit")
+#                    size_num=$(echo "$size" | sed 's/[^0-9.]//g')
+#                    used_num=$(echo "$used" | sed 's/[^0-9.]//g')
+#                    TOTAL_SNAPSHOTS=$(awk "BEGIN {print $TOTAL_SNAPSHOTS + $used_num}")
+#                    ARRAY_SNAPSHOTS+=("$name : $used_num $usedUnit / $size_num $sizeUnit")
                 fi
             done <<< "$CEPH_SNAPSHOTS"
-        fi
+
 
         # Modify ELMNT with new values
         UPDATED_ELMNT=$(echo "$ELMNT" | jq \
             --arg cpu "$CPU_DATA" \
             --arg cpu_percent "$CPU_PERCENT" \
-            --argjson cephDisks "$(printf '%s\n' "${ARRAY_DISKS[@]}" | jq -R . | jq -s .)" \
-            --arg cephBiggerDiskPercentUsage "$(printf '%.2f' $BIGGER)" \
+	    --argjson disk "$(printf '%s\n' "${ARRAY_DISKS[@]}" | jq -R . | jq -s .)" \
+            --arg biggerDiskPercentUsage "$(printf '%.2f' $BIGGER)" \
             --arg totalSnapshots "$(printf '%.1f' $TOTAL_SNAPSHOTS)" \
             --argjson cephSnapshots "$(printf '%s\n' "${ARRAY_SNAPSHOTS[@]}" | jq -R . | jq -s .)" \
             --arg clustername "$clustername" \
             --arg qemuInfo "$QEMU_INFO" \
             --arg cephInfo "$Ceph_Info" \
             --arg oldestSnapshot "$max_days" \
-            '. + {cpu: $cpu, cpu_percent: $cpu_percent, cephDisks: $cephDisks, cephBiggerDiskPercentUsage: $cephBiggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
+            '. + {cpu: $cpu, cpu_percent: $cpu_percent, disk: $disk, biggerDiskPercentUsage: $biggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, oldestSnapshot: $oldestSnapshot}')
 
         UPDATED_VMS+=("$UPDATED_ELMNT")
     done
