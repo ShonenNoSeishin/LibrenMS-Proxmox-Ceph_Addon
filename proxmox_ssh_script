@@ -1,0 +1,17 @@
+#!/bin/bash
+echo "<<<app-proxmox>>>";
+
+if [ -f /etc/pve/corosync.conf ]; then
+    # Si le fichier corosync.conf existe, c'est un cluster, on récupère le clustername
+    clustername=$(grep 'cluster_name' /etc/pve/corosync.conf | awk '{print $2}')
+    echo "$clustername"
+    nodes_ip=$(grep "ring0_addr" /etc/pve/corosync.conf | awk '{print $2}');
+    for node_ip in $nodes_ip; do
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes root@$node_ip "/usr/bin/perl" < /usr/local/bin/proxmox_perl_script;
+    done
+else
+    # Sinon, c'est un simple hôte
+    hostname=$(hostname)
+    echo "$hostname"
+    /usr/local/bin/proxmox_perl_script
+fi
