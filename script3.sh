@@ -27,6 +27,8 @@ wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Add
 rm /opt/librenms/includes/polling/applications/proxmox.inc.php
 wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/proxmox.inc.php -O /opt/librenms/includes/polling/applications/proxmox.inc.php
 
+rm /includes/html/application/proxmox.inc.php
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/Proxmox_Original_File -o /includes/html/application/proxmox.inc.php
 # Modify the $vm variable definition in /opt/librenms/includes/html/pages/apps/proxmox/vm.inc.php
 sed -i '/^\$vm /s/^/\/\//; /\/\/\$vm /a\$vm = proxmox_vm_info($vars['\''vmid'\''], $vars['\''instance'\'']);' /opt/librenms/includes/html/pages/apps/proxmox/vm.inc.php
 
