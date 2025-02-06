@@ -10,9 +10,11 @@ apt update -y
 apt-get install snmp-mibs-downloader -y
 download-mibs
 # Install the LibrenMS agent Proxmox script
-wget https://raw.githubusercontent.com/librenms/librenms-agent/master/agent-local/proxmox -O /usr/local/bin/proxmox
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/proxmox_ssh_script -O /usr/local/bin/proxmox
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/proxmox_perl_script -O /usr/local/bin/proxmox_perl_script
 # Give the corrects rights to the script 
 chmod 755 /usr/local/bin/proxmox
+chmod 755 /usr/local/bin/proxmox_perl_script
 read -p "enter the IP address of Librenms machine : " LibrenmsIP
 
 if [[ -z "$LibrenmsIP" ]]; then
@@ -50,7 +52,7 @@ cd librenms-agent
 cp check_mk_agent /usr/bin/check_mk_agent
 chmod +x /usr/bin/check_mk_agent
 mkdir -p /usr/lib/check_mk_agent/local/ /usr/lib/check_mk_agent/plugins
-cp /opt/librenms-agent/agent-local/proxmox /usr/lib/check_mk_agent/local/proxmox
+wget https://raw.githubusercontent.com/ShonenNoSeishin/LibrenMS-Proxmox-Ceph_Addon/refs/heads/main/proxmox_ssh_script -O /usr/lib/check_mk_agent/local/proxmox
 cp /opt/librenms-agent/agent-local/ceph /usr/lib/check_mk_agent/local/ceph
 chmod +x /usr/lib/check_mk_agent/local/proxmox
 chmod +x /usr/lib/check_mk_agent/local/ceph
@@ -59,11 +61,11 @@ systemctl daemon-reload
 systemctl enable check_mk.socket && systemctl start check_mk.socket
 systemctl restart snmpd
 # Define the lines to add
-sudoers_entry="Debian-snmp ALL=(ALL) NOPASSWD: /usr/local/bin/proxmox\nDebian-snmp ALL=(ALL) NOPASSWD: /usr/lib/check_mk_agent/local/customPVE.sh"
+sudoers_entry="Debian-snmp ALL=(ALL) NOPASSWD: /usr/local/bin/proxmox\nDebian-snmp ALL=(ALL) NOPASSWD: /usr/lib/customPVE.sh"
 
 # Check if the lines already exist in the sudoers file to avoid duplicates
 if ! sudo grep -Fxq "Debian-snmp ALL=(ALL) NOPASSWD: /usr/local/bin/proxmox" /etc/sudoers && \
-   ! sudo grep -Fxq "Debian-snmp ALL=(ALL) NOPASSWD: /usr/lib/check_mk_agent/local/customPVE.sh" /etc/sudoers; then
+   ! sudo grep -Fxq "Debian-snmp ALL=(ALL) NOPASSWD: /usr/lib/customPVE.sh" /etc/sudoers; then
     # Append the entries to the sudoers file securely
     echo -e "$sudoers_entry" | sudo tee -a /etc/sudoers > /dev/null
     echo "Permissions have been added to the sudoers file."
@@ -88,9 +90,28 @@ chmod +x /usr/lib/returnPveInfo.sh
 (crontab -l 2>/dev/null; echo "*/3 * * * * nice /usr/lib/returnPveInfo.sh") | crontab -
 # "Nice" allow to execute the script only if ressources are currently ok, if it isn't optimal to do it, it will wait for exec
 
-### Execute these queries on LibrenMS AND PVE node ###
 download-mibs
 systemctl restart snmpd
+
+## Token creation
+# Ask for token password
+read -sp "Entrez le mot de passe pour lnms_user_api : " PASSWORD
+echo ""
+
+useradd -m -s /bin/bash lnms_user_api && echo "lnms_user_api:$PASSWORD" | sudo chpasswd
+pveum user add lnms_user_api@pam --comment "LibrenMS user for API access"
+TOKEN=$(pveum user token add lnms_user_api@pam api_token --output-format json | jq -r '.value')
+echo "PVE_TOKEN=$TOKEN" > /usr/lib/.env
+echo "PVE_USER=lnms_user_api@pam" >> /usr/lib/.env
+set +H
+Authorization="Authorization='Authorization: PVEAPIToken=${PVE_USER}!api_token=${PVE_TOKEN}'"
+set -H
+echo "$Authorization" >> /usr/lib/.env
+pveum aclmod / -token 'lnms_user_api@pam!api_token' -role Administrator
+pveum acl modify / --roles Administrator --users lnms_user_api@pam
+echo $PVE_IP >> /usr/lib/.env 
+source /usr/lib/.env
+
 
 # Define the line to add to snmpd.conf
 snmpd_entry="extend customPVE /usr/bin/sudo /usr/lib/check_mk_agent/local/customPVE.sh"
@@ -104,5 +125,16 @@ else
     echo "Entry already exists in /etc/snmp/snmpd.conf."
 fi
 
+# Define the line to add to snmpd.conf
+snmpd_entry="extend proxmox /usr/bin/sudo /usr/local/bin/proxmox"
+
+# Check if the line already exists in snmpd.conf
+if ! grep -Fxq "$snmpd_entry" /etc/snmp/snmpd.conf; then
+    # Append the line to snmpd.conf if it's not already present
+    echo "$snmpd_entry" | sudo tee -a /etc/snmp/snmpd.conf > /dev/null
+    echo "Entry added to /etc/snmp/snmpd.conf."
+else
+    echo "Entry already exists in /etc/snmp/snmpd.conf."
+fi
 
 systemctl restart snmpd
