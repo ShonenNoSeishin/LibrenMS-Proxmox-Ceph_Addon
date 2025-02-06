@@ -148,6 +148,15 @@ proxmox:
     - { Field: last_update, Type: varchar(255), 'Null': true, Extra: '' }
   Indexes:
     PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
+proxmox_ports:
+  Columns:
+    - { Field: id, Type: 'int unsigned', 'Null': false, Extra: auto_increment }
+    - { Field: vm_id, Type: int, 'Null': false, Extra: '' }
+    - { Field: port, Type: varchar(10), 'Null': false, Extra: '' }
+    - { Field: last_seen, Type: timestamp, 'Null': false, Extra: '', Default: CURRENT_TIMESTAMP }
+  Indexes:
+    PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
+    proxmox_ports_vm_id_port_unique: { Name: proxmox_ports_vm_id_port_unique, Columns: [vm_id, port], Unique: true, Type: BTREE }
 ````
 
 Note that you should delete the following line because if you have more then one cluster, it's possible to have some VMs with the same VMID : 
@@ -159,7 +168,7 @@ Note that you should delete the following line because if you have more then one
 - in the same file, add this to "devices" section :
 
 ````bash
-  - { Field: ceph_state, Type: varchar(50), 'Null': false, Extra: '', Default: '0' }
+  - { Field: ceph_state, Type: varchar(200), 'Null': false, Extra: '', Default: '0' }
 ````
 
 and run :
@@ -415,13 +424,11 @@ proxmox:
     - { Field: cpu_percent, Type: float, 'Null': true, Extra: '' }
     - { Field: mem, Type: bigint, 'Null': true, Extra: '' }
     - { Field: maxmem, Type: bigint, 'Null': true, Extra: '' }
-    - { Field: disk, Type: bigint, 'Null': true, Extra: '' }
-    - { Field: maxdisk, Type: bigint, 'Null': true, Extra: '' }
+    - { Field: disk, Type: text, 'Null': true, Extra: '' }
     - { Field: netin, Type: bigint, 'Null': true, Extra: '' }
     - { Field: netout, Type: bigint, 'Null': true, Extra: '' }
     - { Field: uptime, Type: 'int', 'Null': true, Extra: '' }
-    - { Field: ceph_disks, Type: text, 'Null': true, Extra: '' }
-    - { Field: ceph_bigger_disk_percent_usage, Type: float, 'Null': true, Extra: '' }
+    - { Field: bigger_disk_percent_usage, Type: float, 'Null': true, Extra: '' }
     - { Field: ceph_snapshots, Type: text, 'Null': true, Extra: '' }
     - { Field: ceph_total_snapshots, Type: float, 'Null': true, Extra: '' }
     - { Field: oldest_snapshot, Type: int, 'Null': true, Extra: '' }
@@ -430,18 +437,27 @@ proxmox:
     - { Field: last_update, Type: varchar(255), 'Null': true, Extra: '' }
   Indexes:
     PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
+proxmox_ports:
+  Columns:
+    - { Field: id, Type: 'int unsigned', 'Null': false, Extra: auto_increment }
+    - { Field: vm_id, Type: int, 'Null': false, Extra: '' }
+    - { Field: port, Type: varchar(10), 'Null': false, Extra: '' }
+    - { Field: last_seen, Type: timestamp, 'Null': false, Extra: '', Default: CURRENT_TIMESTAMP }
+  Indexes:
+    PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
+    proxmox_ports_vm_id_port_unique: { Name: proxmox_ports_vm_id_port_unique, Columns: [vm_id, port], Unique: true, Type: BTREE }
 ````
 
 in the same file, add this line to the "devices" bloc :
 
 ````bash
-    - { Field: ceph_state, Type: varchar(50), 'Null': false, Extra: '', Default: '0' }
+    - { Field: ceph_state, Type: varchar(200), 'Null': false, Extra: '', Default: '0' }
 ````
 
 Apply changes in the database :
 
 ```bash
-mysql -u root -p<enter the databse password here> -e "Use librenms; ALTER TABLE proxmox ADD name varchar(255) NULL AFTER last_seen, ADD status varchar(50) NULL AFTER name, ADD hostname varchar(255) NULL AFTER vmid, ADD cpu int NULL AFTER status, ADD cpus int NULL AFTER cpu, ADD mem bigint NULL AFTER cpus, ADD maxmem bigint NULL AFTER mem, ADD disk text NULL AFTER maxmem, ADD maxdisk bigint NULL AFTER disk, ADD netin bigint NULL AFTER disk, ADD netout bigint NULL AFTER netin, ADD uptime int NULL AFTER netout; ALTER TABLE proxmox MODIFY cluster VARCHAR(255) DEFAULT NULL; ALTER TABLE proxmox CHANGE cluster cluster varchar(255) NOT NULL; ALTER TABLE proxmox ADD bigger_disk_percent_usage float NULL AFTER uptime; ALTER TABLE proxmox ADD ceph_snapshots text NULL AFTER bigger_disk_percent_usage; ALTER TABLE proxmox ADD ceph_total_snapshots float NULL AFTER ceph_snapshots; ALTER TABLE proxmox ADD qemu_info text NULL AFTER ceph_total_snapshots; ALTER TABLE proxmox ADD oldest_snapshot int NULL AFTER ceph_total_snapshots; ALTER TABLE devices ADD ceph_state varchar(50) NULL; ALTER TABLE proxmox DROP INDEX proxmox_cluster_vmid_unique; ALTER TABLE proxmox ADD cpu_percent float NULL AFTER cpus; ALTER TABLE proxmox DROP maxdisk; ALTER TABLE proxmox ADD node_name varchar(255) NULL AFTER qemu_info; ALTER TABLE proxmox ADD node_name varchar(255) NULL AFTER qemu_info; ALTER TABLE proxmox ADD last_update varchar(255) NULL AFTER node_name;"
+mysql -u root -pPassword00 -e "Use librenms; ALTER TABLE proxmox ADD name varchar(255) NULL AFTER last_seen, ADD status varchar(50) NULL AFTER name, ADD hostname varchar(255) NULL AFTER vmid, ADD cpu int NULL AFTER status, ADD cpus int NULL AFTER cpu, ADD mem bigint NULL AFTER cpus, ADD maxmem bigint NULL AFTER mem, ADD disk text NULL AFTER maxmem, ADD maxdisk bigint NULL AFTER disk, ADD netin bigint NULL AFTER disk, ADD netout bigint NULL AFTER netin, ADD uptime int NULL AFTER netout; ALTER TABLE proxmox MODIFY cluster VARCHAR(255) DEFAULT NULL; ALTER TABLE proxmox CHANGE cluster cluster varchar(255) NOT NULL; ALTER TABLE proxmox ADD bigger_disk_percent_usage float NULL AFTER uptime; ALTER TABLE proxmox ADD ceph_snapshots text NULL AFTER bigger_disk_percent_usage; ALTER TABLE proxmox ADD ceph_total_snapshots float NULL AFTER ceph_snapshots; ALTER TABLE proxmox ADD qemu_info text NULL AFTER ceph_total_snapshots; ALTER TABLE proxmox ADD oldest_snapshot int NULL AFTER ceph_total_snapshots; ALTER TABLE devices ADD ceph_state varchar(200) NOT NULL DEFAULT 0; ALTER TABLE proxmox DROP INDEX proxmox_cluster_vmid_unique; ALTER TABLE proxmox ADD cpu_percent float NULL AFTER cpus; ALTER TABLE proxmox DROP maxdisk; ALTER TABLE proxmox ADD node_name varchar(255) NULL AFTER qemu_info; ALTER TABLE proxmox ADD last_update varchar(255) NULL AFTER node_name;"
 ```
 
 ### In the PVE node
