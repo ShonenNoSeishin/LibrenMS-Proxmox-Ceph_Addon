@@ -115,6 +115,15 @@ foreach ($lines as $line) {
     }
 }
 
+// Fetch filter parameters
+$filter_state = Request::get('state');
+$filter_vmid = Request::get('vmid');
+$filter_cpu_percent = Request::get('cpu_percent');
+$filter_disk_empty = Request::get('disk_empty');
+$filter_bigger_disk = Request::get('bigger_disk');
+$filter_oldest_snapshot = Request::get('oldest_snapshot');
+$filter_qemu_info = Request::get('qemu_info');
+
 $servername = getenv('DB_HOST');
 $username = getenv('DB_USERNAME');
 $password = getenv('DB_PASSWORD');
@@ -172,7 +181,29 @@ if (isset($vars['vmid'])) {
 }
 
 // Fetch and group VMs by node
-$sqlGetVms = 'SELECT * FROM proxmox;';
+$sqlGetVms = 'SELECT * FROM proxmox WHERE 1=1';
+if (!empty($filter_state)) {
+    $sqlGetVms .= " AND status = '" . $conn->real_escape_string($filter_state) . "'";
+}
+if (!empty($filter_vmid)) {
+    $sqlGetVms .= " AND vmid = '" . $conn->real_escape_string($filter_vmid) . "'";
+}
+if (!empty($filter_cpu_percent)) {
+    $sqlGetVms .= " AND cpu_percent >= " . intval($filter_cpu_percent);
+}
+if ($filter_disk_empty === 'yes') {
+    $sqlGetVms .= " AND disk = 'a:1:{i:0;s:0:\"\";}'"; // disk empty
+}
+if (!empty($filter_bigger_disk)) {
+    $sqlGetVms .= " AND bigger_disk_percent_usage >= " . intval($filter_bigger_disk);
+}
+if (!empty($filter_oldest_snapshot)) {
+    $sqlGetVms .= " AND oldest_snapshot >= " . intval($filter_oldest_snapshot);
+}
+if ($filter_qemu_info === 'null') {
+    $sqlGetVms .= " AND qemu_info = 'null'";
+}
+
 $result = $conn->query($sqlGetVms);
 
 $grouped_vms = [];
@@ -189,6 +220,68 @@ if ($result->num_rows > 0) {
 // Include CSS styles
 ?>
 <style>
+    .filters-form,
+    .column-selector {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .filters-form label,
+    .column-selector label {
+        font-size: 1rem;
+        margin-right: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .filters-form input[type="text"],
+    .filters-form input[type="number"],
+    .filters-form select {
+        padding: 8px;
+        font-size: 1rem;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        width: 200px;
+    }
+
+    .filters-form input[type="checkbox"] {
+        width: auto;
+        margin: 0 8px;
+    }
+
+    .filters-form button,
+    .column-selector button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.3s ease;
+    }
+
+    .filters-form button:hover,
+    .column-selector button:hover {
+        background-color: #0056b3;
+    }
+
+    .column-selector {
+        margin-top: 20px;
+    }
+
+    .column-selector input {
+        margin-right: 10px;
+    }
+
+    .column-selector label {
+        display: inline-block;
+        margin-bottom: 10px;
+    }
     .container-fluid {
         width: 95%;
         margin: auto;
@@ -253,22 +346,58 @@ if ($result->num_rows > 0) {
         transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
     }
     
-    .table {
-        margin-bottom: 0;
-        min-width: 800px;
+    /* New table wrapper styles */
+    .table-wrapper {
         width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 1rem;
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
+        border-radius: 4px;
     }
     
+    .table {
+        margin-bottom: 0;
+        width: 100%;
+        white-space: nowrap;
+    }
+    
+    /* Fixed column widths */
     .table th {
         background-color: #f8f9fa;
         position: sticky;
         top: 0;
         z-index: 1;
+        min-width: 120px;  /* Base minimum width for all columns */
     }
+    
+    /* Specific column widths */
+    .table th.col-state { min-width: 100px; }
+    .table th.col-vmid { min-width: 80px; }
+    .table th.col-name { min-width: 150px; }
+    .table th.col-node_name { min-width: 150px; }
+    .table th.col-cpu_usage { min-width: 120px; }
+    .table th.col-cpu_percent { min-width: 120px; }
+    .table th.col-mem_usage { min-width: 200px; }
+    .table th.col-disk_usage { min-width: 250px; }
+    .table th.col-bigger_disk { min-width: 120px; }
+    .table th.col-ceph_snapshots { min-width: 200px; }
+    .table th.col-total_snapshots { min-width: 150px; }
+    .table th.col-oldest_snapshot { min-width: 150px; }
+    .table th.col-qemu_info { min-width: 150px; }
+    .table th.col-network_in { min-width: 120px; }
+    .table th.col-network_out { min-width: 120px; }
+    .table th.col-uptime { min-width: 200px; }
     
     .table td, .table th {
         padding: 12px;
         vertical-align: middle;
+    }
+    
+    /* Maintain text wrapping for disk usage column */
+    .table td.disk-usage {
+        white-space: normal;
+        min-width: 250px;
     }
     
     .text-success {
@@ -298,18 +427,6 @@ if ($result->num_rows > 0) {
             padding: 10px 15px;
             font-size: 1em;
         }
-        
-        .node-content {
-            padding: 10px;
-        }
-        
-        .table td, .table th {
-            padding: 8px;
-        }
-	.disk-usage-column {
-    		width: 250px;  /* Ajustez cette valeur selon vos besoins */
-    		white-space: normal;  /* Permet de gérer le texte multi-lignes, si nécessaire */
-	}
     }
 </style>
 
@@ -343,10 +460,10 @@ function toggleNode(nodeId) {
     }
 }
 </script>
-
 <?php
+echo "------------\n";
 // Column selector form
-echo '<form method="POST" id="column-selector">
+echo '<form method="POST" id="column-selector" class="column-selector">
     <input type="hidden" name="_token" value="' . csrf_token() . '">';
 
 foreach ($available_columns as $key => $label) {
@@ -356,11 +473,32 @@ foreach ($available_columns as $key => $label) {
 }
 
 echo '<button type="submit" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
-        Apply
+        Apply column selection
     </button>
 </form>';
 
 $selected_columns = $_POST['columns'] ?? array_keys($available_columns);
+
+?>
+
+<form method="GET" class="filters-form">
+    <label>State:
+        <select name="state">
+            <option value="">All</option>
+            <option value="running">Running</option>
+            <option value="stopped">Stopped</option>
+        </select>
+    </label>
+    <label>VM ID: <input type="text" name="vmid"></label>
+    <label>CPU Usage > <input type="number" name="cpu_percent" min="0"></label>
+    <label>Empty Disk: <input type="checkbox" name="disk_empty" value="yes"></label>
+    <label>Bigger Disk Usage > <input type="number" name="bigger_disk" min="0"></label>
+    <label>Oldest Snapshot > <input type="number" name="oldest_snapshot" min="0"></label>
+    <label>QEMU Info Null: <input type="checkbox" name="qemu_info" value="null"></label>
+    <button type="submit">Apply Filters</button>
+</form>
+
+<?php
 
 // Display VMs grouped by node
 if (!empty($grouped_vms)) {
@@ -380,11 +518,12 @@ if (!empty($grouped_vms)) {
             <div id="' . $node_id . '" class="node-content">';
 
         // Table header
+        echo '<div class="table-wrapper">'; // Add table wrapper
         echo '<table class="table table-striped"><thead><tr>';
         foreach ($selected_columns as $col) {
             if (isset($available_columns[$col])) {
-		$style = $col === 'disk_usage' ? ' style="text-align:center; min-width: 200px;"' : ' style="text-align:center;"';
-		echo '<th' . $style . '>' . $available_columns[$col] . '</th>';
+                $columnClass = 'col-' . $col;
+                echo '<th class="' . $columnClass . '">' . $available_columns[$col] . '</th>';
             }
         }
         echo '</tr></thead><tbody>';
@@ -393,7 +532,8 @@ if (!empty($grouped_vms)) {
         foreach ($vms as $vm) {
             echo '<tr>';
             foreach ($selected_columns as $col) {
-                echo '<td style="text-align:center;">';
+                $tdClass = $col === 'disk_usage' ? 'disk-usage' : '';
+                echo '<td class="' . $tdClass . '">';
                 switch ($col) {
                     case 'state':
                         $statusClass = $vm['status'] === 'running' ? 'text-success' : 'text-danger';
