@@ -222,7 +222,8 @@ sudo -u librenms /opt/librenms/validate.php
 
 ### Examples of alerts
 
-![image](https://github.com/user-attachments/assets/406f7b18-954c-4a91-984c-432183bbeb6b)
+![image](https://github.com/user-attachments/assets/de727dd7-3349-408e-ba7d-2f8bf67d0849)
+
 
 
 ### Alerting by email
