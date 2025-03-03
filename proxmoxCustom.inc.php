@@ -130,7 +130,7 @@ if (!function_exists('upsertVm')) {
         $CephTotalSnapshots = floatval($vm['CephTotalSnapshots']);
         $clustername = $vm['clustername'];
         $description = $name;
-        $qemu_info = $vm['qemuInfo'];
+	$qemu_info = $vm['qemuInfo'];
         $oldest_snapshot = $vm['oldestSnapshot'];
         $node_name = $vm['node'];
         $last_update = $conn->real_escape_string($vm['last_update']);
@@ -267,11 +267,31 @@ if ($result->num_rows > 0) {
                 if ($result) {
                     $exists = $result->fetch_row()[0];
                     if ($exists > 0) {
-                        $cephInfo = $conn->real_escape_string($vms[0]['cephInfo']);
+			$cephInfo = $conn->real_escape_string($vms[0]['cephInfo']);
                         if ($conn->query("UPDATE devices SET ceph_state = '$cephInfo' WHERE device_id = $deviceId") === TRUE) {
                             echo "Ceph info updated successfully.\n";
                         } else {
                             echo "Error updating CephInfo on device: $deviceId: " . $conn->error . "\n";
+                        }
+                    } else {
+                        echo "$deviceId doesn't exist.\n";
+                    }
+                } else {
+                    echo "Error when verifying existence: " . $conn->error . "\n";
+		}
+
+		// update Ceph storage state
+		$sqlCheckExists = "SELECT COUNT(*) FROM devices WHERE device_id = $deviceId";
+                $result = $conn->query($sqlCheckExists);
+
+                if ($result) {
+                    $exists = $result->fetch_row()[0];
+                    if ($exists > 0) {
+			$cephPoolUsage = $conn->real_escape_string($vms[0]['cephPoolUsage']);    
+			if ($conn->query("UPDATE devices SET ceph_pool_usage = '$cephPoolUsage' WHERE device_id = $deviceId") === TRUE) {
+                            echo "Ceph storage updated successfully.\n";
+                        } else {
+                            echo "Error updating cephPoolUsage on device: $deviceId: " . $conn->error . "\n";
                         }
                     } else {
                         echo "$deviceId doesn't exist.\n";
