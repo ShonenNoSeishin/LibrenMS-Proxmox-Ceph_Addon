@@ -223,7 +223,7 @@ sudo -u librenms /opt/librenms/validate.php
 
 ### Examples of alerts
 
-![image](https://github.com/user-attachments/assets/de727dd7-3349-408e-ba7d-2f8bf67d0849)
+![image](https://github.com/user-attachments/assets/152a71e4-8b7c-4b2d-82c7-8e1593a6dfc9)
 
 
 
@@ -255,5 +255,4 @@ chmod +x ./Configure_Syslog_PVE.sh
 
 After that, you should be able to see the node logs in the LibrenMS machine view :
 
-![image](https://github.com/user-attachments/assets/152a71e4-8b7c-4b2d-82c7-8e1593a6dfc9)
-
+![image](https://github.com/user-attachments/assets/c11ab6d4-afff-43b0-9e02-12db6f9e9e73)
