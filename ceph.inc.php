@@ -25,7 +25,7 @@ if ($conn->connect_error) {
 $device_id = $vars['device'];
 
 // SQL query to retrieve required data from the devices table
-$sql = "SELECT device_id, hostname, hardware, ceph_state FROM devices WHERE device_id = $device_id";
+$sql = "SELECT device_id, hostname, hardware, ceph_state, ceph_pool_usage FROM devices WHERE device_id = $device_id";
 $result = $conn->query($sql);
 
 // Check if the query returns any results
@@ -54,7 +54,7 @@ if ($result->num_rows > 0) {
           </style>";
 
     echo "<table>";
-    echo '<tr><th>Device ID</th><th>Hostname</th><th>Hardware</th><th>Ceph State</th></tr>';
+    echo '<tr><th>Device ID</th><th>Hostname</th><th>Hardware</th><th>Ceph State</th><th>Ceph Pool Storage Usage</th></tr>';
 
     // Loop through each row in the result set
     while ($row = $result->fetch_assoc()) {
@@ -63,6 +63,7 @@ if ($result->num_rows > 0) {
         echo '<td>' . $row['hostname'] . '</td>';
         echo '<td>' . $row['hardware'] . '</td>';
         echo '<td>' . $row['ceph_state'] . '</td>';
+        echo '<td>' . $row['ceph_pool_usage'] . '</td>';
         echo "</tr>";
     }
     echo "</table>";
