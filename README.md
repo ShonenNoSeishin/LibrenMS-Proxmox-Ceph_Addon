@@ -169,6 +169,7 @@ Note that you should delete the following line because if you have more then one
 
 ````bash
   - { Field: ceph_state, Type: varchar(200), 'Null': false, Extra: '', Default: '0' }
+  - { Field: ceph_pool_usage, Type: varchar(200), 'Null': false, Extra: '', Default: '0' }
 ````
 
 and run :
