@@ -146,6 +146,7 @@ proxmox:
     - { Field: qemu_info, Type: text, 'Null': true, Extra: '' }
     - { Field: node_name, Type: varchar(255), 'Null': true, Extra: '' }
     - { Field: last_update, Type: varchar(255), 'Null': true, Extra: '' }
+    - { Field: HA_State, Type: varchar(255), 'Null': true, Extra: '' }
   Indexes:
     PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
 proxmox_ports:
