@@ -123,6 +123,7 @@ $filter_disk_empty = Request::get('disk_empty');
 $filter_bigger_disk = Request::get('bigger_disk');
 $filter_oldest_snapshot = Request::get('oldest_snapshot');
 $filter_qemu_info = Request::get('qemu_info');
+$filter_HA_State = Request::get('HA_State');
 
 $servername = getenv('DB_HOST');
 $username = getenv('DB_USERNAME');
@@ -152,7 +153,8 @@ $available_columns = [
     'qemu_info' => 'Qemu Info',
     'network_in' => 'Network IN',
     'network_out' => 'Network OUT',
-    'uptime' => 'Uptime'
+    'uptime' => 'Uptime',
+    'HA_State' => 'HA State',
 ];
 
 // Conditional include for VM details
@@ -202,6 +204,9 @@ if (!empty($filter_oldest_snapshot)) {
 }
 if ($filter_qemu_info === 'null') {
     $sqlGetVms .= " AND qemu_info = 'null'";
+}
+if ($filter_HA_State === 'null') {
+    $sqlGetVms .= " AND HA_State = 'DOWN'";
 }
 
 $result = $conn->query($sqlGetVms);
@@ -495,6 +500,7 @@ $selected_columns = $_POST['columns'] ?? array_keys($available_columns);
     <label>Bigger Disk Usage > <input type="number" name="bigger_disk" min="0"></label>
     <label>Oldest Snapshot > <input type="number" name="oldest_snapshot" min="0"></label>
     <label>QEMU Info Null: <input type="checkbox" name="qemu_info" value="null"></label>
+    <label>HA State DOWN: <input type="checkbox" name="HA_State" value="null"></label>
     <button type="submit">Apply Filters</button>
 </form>
 
@@ -598,7 +604,10 @@ if (!empty($grouped_vms)) {
                     case 'uptime':
                         echo escape_html(formatUptime($vm['uptime']));
                         break;
-                }
+                    case 'HA_State':
+                        echo escape_html($vm['HA_State']);
+                        break;
+		}
                 echo '</td>';
             }
             echo '</tr>';
@@ -625,7 +634,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['download_csv'])) {
     $result = $conn->query($sqlGetVms);
 
     // Define the CSV headers (columns)
-    $csv_headers = array('State', 'VM ID', 'Name', 'Node name', 'CPU Usage', 'CPU Percent Usage', 'Memory Used', 'Disk Usage', 'Bigger Disk Usage', 'Ceph Snapshots', 'Total Snapshots', 'Oldest Snapshot', 'Qemu Info', 'Network IN', 'Network OUT', 'Uptime');
+    $csv_headers = array('State', 'VM ID', 'Name', 'Node name', 'CPU Usage', 'CPU Percent Usage', 'Memory Used', 'Disk Usage', 'Bigger Disk Usage', 'Ceph Snapshots', 'Total Snapshots', 'Oldest Snapshot', 'Qemu Info', 'Network IN', 'Network OUT', 'Uptime', 'HA_State');
 
     // Open PHP output stream for CSV
     header('Content-Type: text/csv');
@@ -657,7 +666,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['download_csv'])) {
             $vm['netin'] ? formatBytes($vm['netin']) : 'NULL',
             $vm['netout'] ? formatBytes($vm['netout']) : 'NULL',
             $vm['uptime'] ? formatUptime($vm['uptime']) : 'NULL',
-        ];
+	    $vm['HA_State'] ? ($vm['HA_State']) : 'NULL',
+	];
             // Write the row to the CSV
             fputcsv($output, $row, ';');
         }
