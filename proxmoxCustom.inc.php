@@ -134,6 +134,7 @@ if (!function_exists('upsertVm')) {
         $oldest_snapshot = $vm['oldestSnapshot'];
         $node_name = $vm['node'];
         $last_update = $conn->real_escape_string($vm['last_update']);
+	$HA_State = $conn->real_escape_string($vm['HA_State']);
 
         // Check if VM exists
         $sqlCheckExists = "SELECT COUNT(*) FROM proxmox WHERE vmid = $vmid AND device_id = $device_id";
@@ -169,7 +170,8 @@ if (!function_exists('upsertVm')) {
                     description = '$description',
                     qemu_info = '$qemu_info',
                     oldest_snapshot = $oldest_snapshot,
-                    last_update = '$last_update'
+		    last_update = '$last_update',
+		    HA_State = '$HA_State'
                 WHERE vmid = $vmid AND device_id = $device_id
             ";
 
@@ -186,14 +188,14 @@ if (!function_exists('upsertVm')) {
                     cpu_percent, mem, maxmem, disk, netin, netout, uptime, 
                     description, cluster, bigger_disk_percent_usage, 
                     ceph_snapshots, ceph_total_snapshots, qemu_info, 
-                    node_name, last_update
+                    node_name, last_update, HA_State
                 )
                 VALUES (
                     '$hostname', $device_id, $vmid, '$name', '$status', 
                     $cpu, $cpus, $cpu_percent, $mem, $maxmem, '$disk', 
                     $netin, $netout, $uptime, '$description', '$clustername', 
                     $biggerDiskPercentUsage, '$cephSnapshots', $CephTotalSnapshots, 
-                    '$qemu_info', '$node_name', '$last_update'
+                    '$qemu_info', '$node_name', '$last_update', '$HA_State'
                 )
             ";
             
