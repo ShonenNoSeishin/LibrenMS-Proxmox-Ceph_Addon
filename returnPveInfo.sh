@@ -7,6 +7,7 @@ CephPoolName="Pool-Replica-3"
 MAX_THREADS=8
 TEMP_DIR="/tmp/vm_data"
 
+
 # Verify if returnPveInfo script is already running
 another_instance() {
    echo "Fill Cache is running already." >>/var/log/fill-cache.log
@@ -19,6 +20,13 @@ if [ "$INSTANCES" -gt 1 ]; then
 fi
 
 mkdir -p "$TEMP_DIR"
+
+contains() {
+    local haystack="$1"
+    local needle="$2"
+    [[ "$haystack" =~ (^|[[:space:]])${needle}($|[[:space:]]) ]] && return 0 || return 1
+}
+
 
 # Fonction pour traiter un VM
 process_vm() {
@@ -34,10 +42,15 @@ process_vm() {
    #sleep 0.25
    #VM_DATA=$(pvesh get /nodes/$NODE/qemu/$VMID/status/current --output-format=json-pretty | jq '{cpu, cpus, diskread, diskwrite, maxdisk, maxmem, mem, name, netin, netout, pid, status, tags, uptime, vmid}')
    VM_DATA=$(curl -s -k --connect-timeout 2 -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/status/current" | jq '.data | {cpu, cpus, diskread, diskwrite, maxdisk, maxmem, mem, name, netin, netout, pid, status, tags, uptime, vmid}')
+   VM_STATUS=$(echo "$VM_DATA" | jq -r .status)
    sleep 0.25
-   #QEMU_INFO=$(pvesh get /nodes/$NODE/qemu/$VMID/agent/network-get-interfaces --output-format json | jq '.result' 2>/dev/null | jq -r '.[] | ."ip-addresses" | .[] | ."ip-address"' 2>/dev/null || echo "null")
-   QEMU_INFO=$(curl -s -k --connect-timeout 2 -X GET -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/agent/network-get-interfaces" | jq -r '.data.result? | if . then .[]?["ip-addresses"]? // [] | .[]?["ip-address"]? // empty else "null" end')
-   sleep 0.25
+    if [[ "$VM_STATUS" == "running" ]]; then
+        #QEMU_INFO=$(pvesh get /nodes/$NODE/qemu/$VMID/agent/network-get-interfaces --output-format json | jq '.result' 2>/dev/null | jq -r '.[] | ."ip-addresses" | .[] | ."ip-address"' 2>/dev/null || echo "null")
+        QEMU_INFO=$(curl -s -k --connect-timeout 2 -X GET -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/agent/network-get-interfaces" | jq -r '.data.result? | if . then .[]?["ip-addresses"]? // [] | .[]?["ip-address"]? // empty else "null" end')
+        sleep 0.25
+    else
+        QEMU_INFO="null"
+    fi
 
    CPU_DATA=$(echo "$TOTAL_DATA" | jq --arg id "qemu/$VMID" '.[] | select(.id == $id) | .cpu')
    CPU_PERCENT=$(echo "$TOTAL_DATA" | jq --arg id "qemu/$VMID" '.[] | select(.id == $id) | ((.cpu * 100 / .maxcpu) * 1000 | round / 1000)')
@@ -45,61 +58,68 @@ process_vm() {
    ARRAY_DISKS=()
    BIGGER=0
 
+   
+
    #snapshots=$(pvesh get /nodes/$NODE/qemu/$VMID/snapshot --output-format json | jq -r '.[] | select(.name != "current") | .name + " " + (.snaptime | todate | split("T")[0]) + " " + (.snaptime | todate | split("T")[1] | split("+")[0] | split("Z")[0])')
-   snapshots=$(curl -s -k --connect-timeout 2 -X GET -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/snapshot" | jq -r '.data[] | select(.name != "current") | .name + " " + (.snaptime | todate | split("T")[0]) + " " + (.snaptime | todate | split("T")[1] | split("+")[0] | split("Z")[0])')
-   sleep 0.25
-   current_date=$(date +%s)
-   max_days=0
+   if [[ "$QEMU_INFO" != "null" ]]; then
+        snapshots=$(curl -s -k --connect-timeout 2 -X GET -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/snapshot" | jq -r '.data[] | select(.name != "current") | .name + " " + (.snaptime | todate | split("T")[0]) + " " + (.snaptime | todate | split("T")[1] | split("+")[0] | split("Z")[0])')
+        sleep 0.25
+        current_date=$(date +%s)
+        max_days=0
 
-   while read -r name date time; do
-       if [[ $date =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-           snapshot_datetime="$date $time"
-           snapshot_timestamp=$(date -d "$snapshot_datetime" +%s)
-           days=$(( (current_date - snapshot_timestamp) / 86400 ))
-           if [ $days -gt $max_days ]; then
-               max_days=$days
-           fi
-       fi
-   done <<< "$snapshots"
+        while read -r name date time; do
+            if [[ $date =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+                snapshot_datetime="$date $time"
+                snapshot_timestamp=$(date -d "$snapshot_datetime" +%s)
+                days=$(( (current_date - snapshot_timestamp) / 86400 ))
+                if [ $days -gt $max_days ]; then
+                    max_days=$days
+                fi
+            fi
+        done <<< "$snapshots"
 
-   VM_STATUS=$(echo "$VM_DATA" | jq -r .status)
-   if [[ "$VM_STATUS" == "running" ]]; then
-       #sleep 0.25
-       # DISK_INFO=$(pvesh get /nodes/${NODE}/qemu/$VMID/agent/get-fsinfo --output-format json 2>/dev/null | jq -r '
-       #     .result[] | 
-       #     select(.["used-bytes"] != null and .["total-bytes"] != null) | 
-       #     "\(.mountpoint) \(.["used-bytes"] / 1024 / 1024 / 1024) GiB \(.["total-bytes"] / 1024 / 1024 / 1024) GiB"
-       # ')
+        if [[ "$VM_STATUS" == "running" ]]; then
+            #sleep 0.25
+            # DISK_INFO=$(pvesh get /nodes/${NODE}/qemu/$VMID/agent/get-fsinfo --output-format json 2>/dev/null | jq -r '
+            #     .result[] | 
+            #     select(.["used-bytes"] != null and .["total-bytes"] != null) | 
+            #     "\(.mountpoint) \(.["used-bytes"] / 1024 / 1024 / 1024) GiB \(.["total-bytes"] / 1024 / 1024 / 1024) GiB"
+            # ')
 
-        DISK_INFO=$(curl -s -k --connect-timeout 2 -X GET -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/agent/get-fsinfo" \
-        | jq -r '
-            if .data != null and .data.result != null then
-                .data.result[] | select(.["used-bytes"] != null and .["total-bytes"] != null) |
-                "\(.mountpoint) \((.["used-bytes"] / 1024 / 1024 / 1024) | tonumber) GiB \((.["total-bytes"] / 1024 / 1024 / 1024) | tonumber) GiB"
-            else
-                empty
-            end
-        ')
-       sleep 0.25
-       if [[ "$DISK_INFO" != *"QEMU guest agent is not running"* && "$DISK_INFO" != *"is not running"* && "$DISK_INFO" != *"No QEMU guest agent configured"* ]]; then
-           while read -r disk_name GiB_used used_unit GiB_size size_unit; do
-               if [[ -n "$disk_name" ]]; then
-                   max_disk=$(echo "$GiB_size" | sed 's/[^0-9.]//g')
-                   used_disk=$(echo "$GiB_used" | sed 's/[^0-9.]//g')
-                   
-                   if [[ -n "$used_disk" ]] && (( $(awk "BEGIN {print ($max_disk != 0)}") )); then
-                       POURCENT=$(awk "BEGIN {print ($used_disk / $max_disk) * 100}")
-                       if (( $(echo "$BIGGER < $POURCENT" | bc -l) )); then
-                           BIGGER=$POURCENT
-                       fi
-                   fi
+            DISK_INFO=$(curl -s -k --connect-timeout 2 -X GET -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/agent/get-fsinfo" \
+            | jq -r '
+                if .data != null and .data.result != null then
+                    .data.result[] | select(.["used-bytes"] != null and .["total-bytes"] != null) |
+                    "\(.mountpoint) \((.["used-bytes"] / 1024 / 1024 / 1024) | tonumber) GiB \((.["total-bytes"] / 1024 / 1024 / 1024) | tonumber) GiB"
+                else
+                    empty
+                end
+            ')
+            sleep 0.25
+            if [[ "$DISK_INFO" != *"QEMU guest agent is not running"* && "$DISK_INFO" != *"is not running"* && "$DISK_INFO" != *"No QEMU guest agent configured"* ]]; then
+                while read -r disk_name GiB_used used_unit GiB_size size_unit; do
+                    if [[ -n "$disk_name" ]]; then
+                        max_disk=$(echo "$GiB_size" | sed 's/[^0-9.]//g')
+                        used_disk=$(echo "$GiB_used" | sed 's/[^0-9.]//g')
+                        
+                        if [[ -n "$used_disk" ]] && (( $(awk "BEGIN {print ($max_disk != 0)}") )); then
+                            POURCENT=$(awk "BEGIN {print ($used_disk / $max_disk) * 100}")
+                            if (( $(echo "$BIGGER < $POURCENT" | bc -l) )); then
+                                BIGGER=$POURCENT
+                            fi
+                        fi
 
-                   used_disk_rounded=$(printf "%.2f" "$used_disk")
-                   max_disk_rounded=$(printf "%.2f" "$max_disk")
-                   ARRAY_DISKS+=("$disk_name : $used_disk_rounded / $max_disk_rounded $size_unit")
-               fi
-           done <<< "$DISK_INFO"
-       fi
+                        used_disk_rounded=$(printf "%.2f" "$used_disk")
+                        max_disk_rounded=$(printf "%.2f" "$max_disk")
+                        ARRAY_DISKS+=("$disk_name : $used_disk_rounded / $max_disk_rounded $size_unit")
+                    fi
+                done <<< "$DISK_INFO"
+            fi
+        fi
+
+   else
+      snapshots="null"
+      max_days=0
    fi
 
    TOTAL_SNAPSHOTS=0
@@ -119,9 +139,9 @@ process_vm() {
                esac
 	       # Remove the first entry, which is just a reference to memory state at a given time, not actual used space
                if [ $i -ne 0 ]; then
-		       TOTAL_SNAPSHOTS=$(awk "BEGIN {print $TOTAL_SNAPSHOTS + $used_gib}")
+		           TOTAL_SNAPSHOTS=$(awk "BEGIN {print $TOTAL_SNAPSHOTS + $used_gib}")
         	       ARRAY_SNAPSHOTS+=("$name : $used_num $usedUnit / $size_num $sizeUnit")
-	       fi
+	           fi
            fi
 	   i=$((i+1))
        done <<< "$CEPH_SNAPSHOTS"
@@ -129,6 +149,15 @@ process_vm() {
    fi
 
    last_update=$(date +"%H:%M:%S")
+
+   HA_State=$(curl -s -k --connect-timeout 2 -H "$Authorization" "https://10.61.0.51:8006/api2/json/nodes/$NODE/qemu/$VMID/status/current" | jq '.data.ha.managed')
+   sleep 0.25
+   # Utilisation de la syntaxe correcte pour comparer les chaînes
+   if [[ $HA_State == 1 ]]; then
+      HA_State="UP"
+   else
+      HA_State="DOWN"
+   fi
 
    VM_JSON=$(echo "$VM_DATA" | jq \
        --arg cpu "$CPU_DATA" \
@@ -140,14 +169,16 @@ process_vm() {
        --arg clustername "$clustername" \
        --arg qemuInfo "$QEMU_INFO" \
        --arg cephInfo "$Ceph_Info" \
+       --arg HA_State "$HA_State" \
        --arg cephPoolUsage "$CEPH_POOL_USAGE" \
        --arg oldestSnapshot "$max_days" \
        --arg node "$NODE" \
        --arg vmid "$VMID" \
        --arg last_update "$last_update" \
-       '. + {vmid: $vmid, cpu: $cpu, cpu_percent: $cpu_percent, disk: $disk, biggerDiskPercentUsage: $biggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, cephPoolUsage: $cephPoolUsage, oldestSnapshot: $oldestSnapshot, node: $node, last_update: $last_update}')
+       '. + {vmid: $vmid, cpu: $cpu, cpu_percent: $cpu_percent, disk: $disk, biggerDiskPercentUsage: $biggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, HA_State: $HA_State, cephPoolUsage: $cephPoolUsage, oldestSnapshot: $oldestSnapshot, node: $node, last_update: $last_update}')
 
    echo "$VM_JSON" > "$TEMP_FILE"
+   return 0
 }
 
 PVESH=$(which pvesh)
