@@ -39,6 +39,11 @@ process_vm() {
    local CEPH_TOTAL_INFO=$6
    local CEPH_POOL_USAGE=$7
 
+   if curl -s -k --connect-timeout 2 -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/config" | grep -q snap; then
+        echo "Un snapshot est en cours pour la VM $VMID sur le node $NODE. Sortie de la fonction."
+        return  # Sort de la fonction sans arrêter le script
+   fi
+
    #sleep 0.25
    #VM_DATA=$(pvesh get /nodes/$NODE/qemu/$VMID/status/current --output-format=json-pretty | jq '{cpu, cpus, diskread, diskwrite, maxdisk, maxmem, mem, name, netin, netout, pid, status, tags, uptime, vmid}')
    VM_DATA=$(curl -s -k --connect-timeout 2 -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/status/current" | jq '.data | {cpu, cpus, diskread, diskwrite, maxdisk, maxmem, mem, name, netin, netout, pid, status, tags, uptime, vmid}')
