@@ -155,14 +155,23 @@ process_vm() {
 
    last_update=$(date +"%H:%M:%S")
 
-   HA_State=$(curl -s -k --connect-timeout 2 -H "$Authorization" "https://10.61.0.51:8006/api2/json/nodes/$NODE/qemu/$VMID/status/current" | jq '.data.ha.managed')
+   HA_State=$(curl -s -k --connect-timeout 2 -H "$Authorization" "https://10.61.0.51:8006/api2/json/nodes/$NODE/qemu/$VMID/status/current" | jq '.data.ha.state')
    sleep 0.25
-   # Utilisation de la syntaxe correcte pour comparer les chaînes
-   if [[ $HA_State == 1 ]]; then
-      HA_State="UP"
-   else
-      HA_State="DOWN"
-   fi
+   
+   # Nettoyer les espaces et retours à la ligne éventuels
+    HA_State=$(echo "$HA_State" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    echo "$HA_State"
+
+    sleep 0.25
+
+    # Comparaison des chaînes et ajustement de la valeur de HA_State
+    if [[ -z "$HA_State" || $HA_State == "null" ]]; then
+        HA_State="Out_of_HA"
+    elif [[ "$HA_State" == \"error\" ]]; then
+        HA_State="Error"
+    elif [[ "$HA_State" == \"started\" ]]; then
+        HA_State="UP"
+    fi
 
    VM_JSON=$(echo "$VM_DATA" | jq \
        --arg cpu "$CPU_DATA" \
@@ -174,7 +183,7 @@ process_vm() {
        --arg clustername "$clustername" \
        --arg qemuInfo "$QEMU_INFO" \
        --arg cephInfo "$Ceph_Info" \
-       --arg HA_State "$HA_State" \
+       --arg HA_State $HA_State \
        --arg cephPoolUsage "$CEPH_POOL_USAGE" \
        --arg oldestSnapshot "$max_days" \
        --arg node "$NODE" \
