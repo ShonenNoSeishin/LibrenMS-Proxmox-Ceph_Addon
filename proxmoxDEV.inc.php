@@ -206,7 +206,7 @@ if ($filter_qemu_info === 'null') {
     $sqlGetVms .= " AND qemu_info = 'null'";
 }
 if ($filter_HA_State === 'null') {
-    $sqlGetVms .= " AND HA_State = 'DOWN'";
+    $sqlGetVms .= " AND HA_State != 'UP'";
 }
 
 $result = $conn->query($sqlGetVms);
@@ -500,7 +500,7 @@ $selected_columns = $_POST['columns'] ?? array_keys($available_columns);
     <label>Bigger Disk Usage > <input type="number" name="bigger_disk" min="0"></label>
     <label>Oldest Snapshot > <input type="number" name="oldest_snapshot" min="0"></label>
     <label>QEMU Info Null: <input type="checkbox" name="qemu_info" value="null"></label>
-    <label>HA State DOWN: <input type="checkbox" name="HA_State" value="null"></label>
+    <label>HA State NOT UP: <input type="checkbox" name="HA_State" value="null"></label>
     <button type="submit">Apply Filters</button>
 </form>
 
