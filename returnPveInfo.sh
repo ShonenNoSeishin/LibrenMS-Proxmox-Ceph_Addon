@@ -1,6 +1,4 @@
 #!/bin/bash
-# Proxmox VE virtual machine listing
-# (c) 2015-2019, Tom Laermans for Observium
 
 source /usr/lib/.env
 CephPoolName="Pool-Replica-3"
