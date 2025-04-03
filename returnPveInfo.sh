@@ -101,7 +101,7 @@ process_vm() {
             sleep 0.25
             if [[ "$DISK_INFO" != *"QEMU guest agent is not running"* && "$DISK_INFO" != *"is not running"* && "$DISK_INFO" != *"No QEMU guest agent configured"* ]]; then
                 while read -r disk_name GiB_used used_unit GiB_size size_unit; do
-                    if [[ -n "$disk_name" ]]; then
+                    if [[ -n "$disk_name" && ! "$disk_name" =~ ^/snap ]]; then # to not take in count /snap/lxd... disks
                         max_disk=$(echo "$GiB_size" | sed 's/[^0-9.]//g')
                         used_disk=$(echo "$GiB_used" | sed 's/[^0-9.]//g')
                         
