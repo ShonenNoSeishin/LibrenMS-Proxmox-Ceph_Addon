@@ -113,17 +113,18 @@ echo $PVE_IP >> /usr/lib/.env
 source /usr/lib/.env
 
 
-# Define the line to add to snmpd.conf
-snmpd_entry="extend customPVE /usr/bin/sudo /usr/lib/check_mk_agent/local/customPVE.sh"
 
-# Check if the line already exists in snmpd.conf
-if ! grep -Fxq "$snmpd_entry" /etc/snmp/snmpd.conf; then
-    # Append the line to snmpd.conf if it's not already present
-    echo "$snmpd_entry" | sudo tee -a /etc/snmp/snmpd.conf > /dev/null
-    echo "Entry added to /etc/snmp/snmpd.conf."
-else
-    echo "Entry already exists in /etc/snmp/snmpd.conf."
-fi
+for i in {1..5}; do
+    snmpd_entry="extend customPVE$i /usr/bin/sudo /usr/lib/customPVE.sh $i"
+
+    if ! grep -Fxq "$snmpd_entry" /etc/snmp/snmpd.conf; then
+        echo "$snmpd_entry" | sudo tee -a /etc/snmp/snmpd.conf > /dev/null
+        echo "Entry added: $snmpd_entry"
+    else
+        echo "Entry already exists: $snmpd_entry"
+    fi
+done
+
 
 # Define the line to add to snmpd.conf
 snmpd_entry="extend proxmox /usr/bin/sudo /usr/local/bin/proxmox"
