@@ -1,12 +1,21 @@
 #!/bin/bash
-# Proxmox VE virtual machine listing
-# (c) 2015-2019, Tom Laermans for Observium
-#!/bin/bash
 
-if [ $(wc -l < "/usr/lib/PVE_INFO.txt") -le 2 ]; then
-    # If the file contains less then 3 lines, it exec the script to full the txt file
-    /usr/lib/returnPveInfo.sh
-    #/usr/lib/customPVE.sh
+parametre="$1"
+
+# Vérifie que le paramètre est fourni
+if [ -z "$parametre" ]; then
+  echo "Usage: $0 <parametre>"
+  exit 1
 fi
 
-cat /usr/lib/PVE_INFO.txt
+# Construit le chemin complet
+fichier="/usr/lib/PVE_INFO${parametre}.txt"
+
+# Vérifie que le fichier existe
+if [ ! -f "$fichier" ]; then
+  echo "Fichier introuvable: $fichier"
+  exit 2
+fi
+
+cat "$fichier"
+
