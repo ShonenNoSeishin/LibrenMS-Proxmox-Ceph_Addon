@@ -5,6 +5,10 @@ CephPoolName="Pool-Replica-3"
 MAX_THREADS=8
 TEMP_DIR="/tmp/vm_data"
 
+LOG_FILE="/usr/lib/returnpveinfo.log"
+
+# Don t send to syslog
+exec >"$LOG_FILE" 2>&1
 
 # Verify if returnPveInfo script is already running
 another_instance() {
@@ -140,7 +144,7 @@ process_vm() {
                    "MiB") used_gib=$(awk "BEGIN {print $used_num / 1024}") ;;
                    "KiB") used_gib=$(awk "BEGIN {print $used_num / 1024 / 1024}") ;;
                esac
-	       # Remove the first entry, which is just a reference to memory state at a given time, not actual used space
+	           # Remove the first entry, which is just a reference to memory state at a given time, not actual used space
                if [ $i -ne 0 ]; then
 		           TOTAL_SNAPSHOTS=$(awk "BEGIN {print $TOTAL_SNAPSHOTS + $used_gib}")
         	       ARRAY_SNAPSHOTS+=("$name : $used_num $usedUnit / $size_num $sizeUnit")
@@ -158,7 +162,7 @@ process_vm() {
    
    # Nettoyer les espaces et retours à la ligne éventuels
     HA_State=$(echo "$HA_State" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    echo "$HA_State"
+    # echo "$HA_State"
 
     sleep 0.25
 
@@ -257,14 +261,36 @@ if [ $? -eq 0 ]; then
        [ -f "$f" ] && ALL_VMS+=("$(cat "$f")")
    done
 
-   echo "<<<proxmox-qemu>>>" > "/usr/lib/TMP_PVE_INFO.txt"
-   echo "${ALL_VMS[@]}" | jq -s '.' >> "/usr/lib/TMP_PVE_INFO.txt"
+    # Output all VMs data from all nodes
+    echo "<<<proxmox-qemu>>>" > "/usr/lib/TMP_PVE_INFO.txt"
+    echo "${ALL_VMS[@]}" | jq -s '.' >> "/usr/lib/TMP_PVE_INFO.txt"
+    cp /usr/lib/TMP_PVE_INFO.txt /usr/lib/PVE_INFO.txt
 
-   xz -9 -c /usr/lib/TMP_PVE_INFO.txt | base64 > "/usr/lib/ENC_TMP_PVE_INFO.txt"
-   cp /usr/lib/ENC_TMP_PVE_INFO.txt /usr/lib/PVE_INFO.txt
+    #cat "/usr/lib/PVE_INFO.txt" | gzip -c > "/usr/lib/ENC_PVE_INFO.txt"
+    xz -9 -c /usr/lib/TMP_PVE_INFO.txt > "/usr/lib/ENC_PVE_INFO.txt"
 
-   rm -rf "$TEMP_DIR"
+    # Chemin du fichier source
+    SOURCE_FILE="/usr/lib/ENC_PVE_INFO.txt"
 
-   find ~/.ssh -type s -name "control-*" -mtime +10 -delete
+    # Vérifier que le fichier source existe
+    if [ ! -f "$SOURCE_FILE" ]; then
+        echo "Erreur : Fichier $SOURCE_FILE introuvable."
+        exit 1
+    fi
+    FILE_SIZE=$(stat -c%s "/usr/lib/TMP_PVE_INFO.txt")
+    CHUNK_SIZE=$(( (FILE_SIZE + 4) / 5 ))
+
+    # Diviser, compresser, encoder chaque chunk en base64, et écrire
+    for i in $(seq 1 5); do
+        START_BYTE=$((CHUNK_SIZE * (i - 1)))
+        # Fichier temporaire pour le chunk du JSON
+        CHUNK_TXT="/tmp/chunk_$i.txt"
+        dd if="/usr/lib/TMP_PVE_INFO.txt" of="$CHUNK_TXT" bs=1 skip="$START_BYTE" count="$CHUNK_SIZE" status=none
+        
+        # Compresser puis encoder ce chunk
+        xz -9 -c "$CHUNK_TXT" | base64 -w0 > "/usr/lib/PVE_INFO${i}.txt"
+        echo "Partie $i encodée dans /usr/lib/PVE_INFO${i}.txt."
+        rm -f "$CHUNK_TXT"
+    done
 
 fi
