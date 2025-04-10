@@ -219,121 +219,166 @@ if ($result->num_rows > 0) {
     
     // SNMP configuration
     $timeout = 30;
-    $oid = ".1.3.6.1.4.1.8072.1.3.2.3.1.2.9.99.117.115.116.111.109.80.86.69";
+    $oids = [
+        ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.49",
+        ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.50", 
+        ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.51",
+        ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.52",
+        ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.53"
+    ];
     $community = 'LibrenMSPublic';
-    $snmpCommand = "snmpget -v2c -c $community $host $oid";
-    
-    $response = shell_exec($snmpCommand);
+    $compressed_chunks = [];
 
-    if (!$response) {
-        echo "Unable to get SNMP result for hostname: $host\n";
-    } else {
-        echo "$host connected successfully via SNMP\n";
-        //echo "$response";
+    // Récupérer chaque partie individuellement
+    for ($i = 0; $i < count($oids); $i++) {
+        $oid = $oids[$i];
 
-        // Process SNMP response
-        $compressed_data = '';
-        if (preg_match('/STRING:\s*"([^"]*)"/', $response, $matches)) {
-        //    echo "matches[1]";
-            $compressed_data = trim($matches[1]);
-        //    echo "$compressed_data";
-            
-            // Decompress data
-            $decoded = base64_decode($compressed_data);
-            file_put_contents('/tmp/temp.xz', $decoded);
-            $decompressed = shell_exec('xz -dc /tmp/temp.xz');
-            unlink('/tmp/temp.xz');
+        $snmpCommand = "snmpget -v2c -c $community $host $oid";
+        $response = shell_exec($snmpCommand);
 
-            if (empty($decompressed)) {
-                echo "Error during decompression\n";
+        if (!$response) {
+            echo "Impossible de récupérer le résultat SNMP pour l'OID $oid sur l'hôte $host:$port\n";
+        }
+        else {
+            if (preg_match('/STRING: (.+)/', $response, $matches)) {
+                $compressed_chunks[] = trim($matches[1]);
+                echo "$host:$port connecté avec succès via SNMP pour l'OID $oid\n";
+            }
+        }
+        usleep(500000); // 500ms de pause entre chaque requête
+    }
+
+    // Traitement des chunks compressés
+    $json_parts = [];
+
+    foreach ($compressed_chunks as $index => $chunk) {
+        $chunk_index = $index + 1;
+        echo "Traitement du chunk $chunk_index\n";
+        
+        // Décodage base64
+        $decoded = base64_decode($chunk);
+        if ($decoded === false) {
+            echo "Erreur de décodage base64 sur le chunk $chunk_index\n";
+            continue;
+        }
+        
+        // Décompression XZ directement en PHP si possible
+        $temp_file = "/tmp/temp_chunk_{$chunk_index}.xz";
+        file_put_contents($temp_file, $decoded);
+        
+        exec("xz -dc $temp_file 2>/tmp/xz_error_{$chunk_index}.log", $output, $return_code);
+        
+        if ($return_code !== 0) {
+            echo "Erreur avec le chunk $chunk_index: " . file_get_contents("/tmp/xz_error_{$chunk_index}.log") . "\n";
+        } else {
+            // Ajouter la sortie décompressée à notre tableau
+            $json_parts[] = implode("\n", $output);
+        }
+        
+        // Nettoyage
+        if (file_exists($temp_file)) {
+            unlink($temp_file);
+        }
+        if (file_exists("/tmp/xz_error_{$chunk_index}.log")) {
+            unlink("/tmp/xz_error_{$chunk_index}.log");
+        }
+        
+        $output = [];
+    }
+            // Extract JSON data
+    if (!empty($json_parts)) {
+        $combined_json = implode("", $json_parts);
+        if (preg_match('/(\[\s*{.*}\s*\])/s', $combined_json, $matches) ||
+            preg_match('/({.*})/s', $combined_json, $matches)) {
+            $json_content = $matches[1];
+        }
+        preg_match('/\[\s*{.*}\s*]/s', $combined_json, $matches);
+        if (isset($matches[0])) {
+            $jsonResponse = $matches[0];
+            echo $jsonResponse;
+            $vms = json_decode($jsonResponse, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                echo 'Error decoding JSON: ' . json_last_error_msg();
                 exit;
             }
+	   }
 
-            // Extract JSON data
-            preg_match('/\[\s*{.*}\s*]/s', $decompressed, $matches);
-            if (isset($matches[0])) {
-                $jsonResponse = $matches[0];
-                echo $jsonResponse;
-                $vms = json_decode($jsonResponse, true);
+    } else {
+        echo "No chunk successfully decompressed\n";
+    }
 
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    echo 'Error decoding JSON: ' . json_last_error_msg();
-                    exit;
-                }
+    // Update Ceph information
+    $deviceId = (int) $device['device_id'];
+    $sqlCheckExists = "SELECT COUNT(*) FROM devices WHERE device_id = $deviceId";
+    $result = $conn->query($sqlCheckExists);
 
-                // Update Ceph information
-                $deviceId = (int) $device['device_id'];
-                $sqlCheckExists = "SELECT COUNT(*) FROM devices WHERE device_id = $deviceId";
-                $result = $conn->query($sqlCheckExists);
+    if ($result) {
+        $exists = $result->fetch_row()[0];
+        if ($exists > 0) {
+            $cephInfo = $conn->real_escape_string($vms[0]['cephInfo']);
+            if ($conn->query("UPDATE devices SET ceph_state = '$cephInfo' WHERE device_id = $deviceId") === TRUE) {
+                echo "Ceph info updated successfully.\n";
+            } else {
+                echo "Error updating CephInfo on device: $deviceId: " . $conn->error . "\n";
+            }
+        } else {
+            echo "$deviceId doesn't exist.\n";
+        }
+    } else {
+        echo "Error when verifying existence: " . $conn->error . "\n";
+    }
 
-                if ($result) {
-                    $exists = $result->fetch_row()[0];
-                    if ($exists > 0) {
-			$cephInfo = $conn->real_escape_string($vms[0]['cephInfo']);
-                        if ($conn->query("UPDATE devices SET ceph_state = '$cephInfo' WHERE device_id = $deviceId") === TRUE) {
-                            echo "Ceph info updated successfully.\n";
-                        } else {
-                            echo "Error updating CephInfo on device: $deviceId: " . $conn->error . "\n";
-                        }
-                    } else {
-                        echo "$deviceId doesn't exist.\n";
-                    }
-                } else {
-                    echo "Error when verifying existence: " . $conn->error . "\n";
-		}
+	// update Ceph storage state
+	$sqlCheckExists = "SELECT COUNT(*) FROM devices WHERE device_id = $deviceId";
+    $result = $conn->query($sqlCheckExists);
 
-		// update Ceph storage state
-		$sqlCheckExists = "SELECT COUNT(*) FROM devices WHERE device_id = $deviceId";
-                $result = $conn->query($sqlCheckExists);
-
-                if ($result) {
-                    $exists = $result->fetch_row()[0];
-                    if ($exists > 0) {
+    if ($result) {
+        $exists = $result->fetch_row()[0];
+        if ($exists > 0) {
 			$cephPoolUsage = $conn->real_escape_string($vms[0]['cephPoolUsage']);    
 			if ($conn->query("UPDATE devices SET ceph_pool_usage = '$cephPoolUsage' WHERE device_id = $deviceId") === TRUE) {
-                            echo "Ceph storage updated successfully.\n";
-                        } else {
-                            echo "Error updating cephPoolUsage on device: $deviceId: " . $conn->error . "\n";
-                        }
-                    } else {
-                        echo "$deviceId doesn't exist.\n";
-                    }
-                } else {
-                    echo "Error when verifying existence: " . $conn->error . "\n";
-                }
-
-                // Process VMs
-                $DB_VM_list_query = "SELECT vmid FROM proxmox WHERE hostname = '$host'";
-                $DB_VM_list_result = $conn->query($DB_VM_list_query);
-
-                $existing_vm_ids = [];
-                while ($row = $DB_VM_list_result->fetch_assoc()) {
-                    $existing_vm_ids[] = (int) $row['vmid'];
-                }
-
-                // Update VM information
-                print_r($existing_vm_ids);
-                $vmid_list = [];
-
-                $sqlGetDeviceID = "SELECT device_id FROM devices WHERE hostname = '$host'";
-                $result = $conn->query($sqlGetDeviceID);
-                $row = $result->fetch_assoc();
-                foreach ($vms as $vm) {
-                    $int_vmid = (int) $vm['vmid'];
-                    $vmid_list[] = $int_vmid;
-                    
-                    $vm['device_id'] = $row['device_id'];
-                    $vm['hostname'] = $host;
-                    upsertVm($conn, $vm);
-                }
-
-                // Remove non-existing VMs
-                foreach ($existing_vm_ids as $db_vmid) {
-                    if (!in_array($db_vmid, $vmid_list, true)) {
-                        deleteVmFromVmid($conn, $db_vmid, $host);
-                    }
-                }
+                echo "Ceph storage updated successfully.\n";
+            } else {
+                echo "Error updating cephPoolUsage on device: $deviceId: " . $conn->error . "\n";
             }
+        } else {
+            echo "$deviceId doesn't exist.\n";
+        }
+    } else {
+        echo "Error when verifying existence: " . $conn->error . "\n";
+    }
+
+    // Process VMs
+    $DB_VM_list_query = "SELECT vmid FROM proxmox WHERE hostname = '$host'";
+    $DB_VM_list_result = $conn->query($DB_VM_list_query);
+
+    $existing_vm_ids = [];
+    while ($row = $DB_VM_list_result->fetch_assoc()) {
+        $existing_vm_ids[] = (int) $row['vmid'];
+    }
+
+    // Update VM information
+    print_r($existing_vm_ids);
+    $vmid_list = [];
+
+    $sqlGetDeviceID = "SELECT device_id FROM devices WHERE hostname = '$host'";
+    $result = $conn->query($sqlGetDeviceID);
+    $row = $result->fetch_assoc();
+    foreach ($vms as $vm) {
+	if ($vm['name'] != null && $vm['cpus'] != null){
+        	$int_vmid = (int) $vm['vmid'];
+        	$vmid_list[] = $int_vmid;
+        	$vm['device_id'] = $row['device_id'];
+        	$vm['hostname'] = $host;
+	        upsertVm($conn, $vm);
+	}
+    }
+
+    // Remove non-existing VMs
+    foreach ($existing_vm_ids as $db_vmid) {
+        if (!in_array($db_vmid, $vmid_list, true)) {
+            deleteVmFromVmid($conn, $db_vmid, $host);
         }
     }
 } else {
