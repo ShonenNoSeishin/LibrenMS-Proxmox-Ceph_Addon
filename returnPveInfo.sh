@@ -22,6 +22,8 @@ if [ "$INSTANCES" -gt 1 ]; then
 fi
 
 mkdir -p "$TEMP_DIR"
+# clean old temp files
+rm -f "$TEMP_DIR"/*.json
 
 contains() {
     local haystack="$1"
