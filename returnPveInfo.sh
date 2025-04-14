@@ -22,7 +22,9 @@ if [ "$INSTANCES" -gt 1 ]; then
 fi
 
 mkdir -p "$TEMP_DIR"
+mkdir "$TEMP_DIR"/bak
 # clean old temp files
+cp "$TEMP_DIR"/*.json "$TEMP_DIR"/bak/
 rm -f "$TEMP_DIR"/*.json
 
 contains() {
