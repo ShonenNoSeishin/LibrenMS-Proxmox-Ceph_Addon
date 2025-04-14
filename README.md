@@ -147,6 +147,7 @@ proxmox:
     - { Field: node_name, Type: varchar(255), 'Null': true, Extra: '' }
     - { Field: last_update, Type: varchar(255), 'Null': true, Extra: '' }
     - { Field: HA_State, Type: varchar(255), 'Null': true, Extra: '' }
+    - { Field: No_Qemu_GA, Type: "enum('No','Yes')", 'Null': false, Extra: '', Default: 'No' }
   Indexes:
     PRIMARY: { Name: PRIMARY, Columns: [id], Unique: true, Type: BTREE }
 proxmox_ports:
