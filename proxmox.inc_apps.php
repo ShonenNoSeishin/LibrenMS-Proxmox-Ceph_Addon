@@ -4,6 +4,64 @@
  * Displays Proxmox cluster and VM information in a web interface
  */
 
+// Gérer les requêtes AJAX pour la mise à jour de No_Qemu_GA
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_qemu_ga'])) {
+    // Vérifier le token CSRF
+    if (!isset($_POST['_token']) || $_POST['_token'] !== csrf_token()) {
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
+
+    // Récupérer les paramètres
+    $vmid = isset($_POST['vmid']) ? intval($_POST['vmid']) : 0;
+    $status = isset($_POST['status']) && $_POST['status'] === 'Yes' ? 'Yes' : 'No';
+
+    // Vérifier que le VMID est valide
+    if ($vmid <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid VM ID']);
+        exit;
+    }
+
+    // Configuration de la base de données
+    $env = file_get_contents(__DIR__."/opt/librenms/.env");
+    $lines = explode("\n", $env);
+
+    foreach ($lines as $line) {
+        preg_match("/([^#]+)\=(.*)/", $line, $matches);
+        if (isset($matches[2])) {
+            putenv(trim($line));
+        }
+    }
+
+    $servername = getenv('DB_HOST');
+    $username = getenv('DB_USERNAME');
+    $password = getenv('DB_PASSWORD');
+    $dbname = getenv('DB_USERNAME');
+
+    // Connexion à la base de données
+    $conn = new mysqli($servername, $username, $password, $dbname);
+
+    // Vérifier la connexion
+    if ($conn->connect_error) {
+        echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+        exit;
+    }
+
+    // Préparer et exécuter la requête
+    $stmt = $conn->prepare("UPDATE proxmox SET `No_Qemu_GA` = ? WHERE vmid = ?");
+    $stmt->bind_param('si', $status, $vmid);
+
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Database update failed']);
+    }
+
+    $stmt->close();
+    $conn->close();
+    exit;
+}
+
 require_once 'includes/html/application/proxmox.inc.php';
 
 // Define available graphs
@@ -124,6 +182,7 @@ $filter_bigger_disk = Request::get('bigger_disk');
 $filter_oldest_snapshot = Request::get('oldest_snapshot');
 $filter_qemu_info = Request::get('qemu_info');
 $filter_HA_State = Request::get('HA_State');
+$filter_hide_no_qemu_ga = Request::get('hide_no_qemu_ga');
 
 $servername = getenv('DB_HOST');
 $username = getenv('DB_USERNAME');
@@ -155,6 +214,7 @@ $available_columns = [
     'network_out' => 'Network OUT',
     'uptime' => 'Uptime',
     'HA_State' => 'HA State',
+    'No_Qemu_GA' => 'No Qemu-GA',
 ];
 
 // Conditional include for VM details
@@ -207,6 +267,9 @@ if ($filter_qemu_info === 'null') {
 }
 if ($filter_HA_State === 'null') {
     $sqlGetVms .= " AND HA_State != 'UP'";
+}
+if ($filter_hide_no_qemu_ga === 'yes') {
+    $sqlGetVms .= " AND (`No_Qemu_GA` IS NULL OR `No_Qemu_GA` != 'Yes')";
 }
 
 $result = $conn->query($sqlGetVms);
@@ -393,6 +456,7 @@ if ($result->num_rows > 0) {
     .table th.col-network_in { min-width: 120px; }
     .table th.col-network_out { min-width: 120px; }
     .table th.col-uptime { min-width: 200px; }
+    .table th.col-No_Qemu_GA { min-width: 120px; }
     
     .table td, .table th {
         padding: 12px;
@@ -435,7 +499,7 @@ if ($result->num_rows > 0) {
     }
 </style>
 
-<!-- JavaScript for node toggling -->
+<!-- JavaScript for node toggling and No_Qemu_GA updating -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     // Initialize all nodes as open
@@ -447,6 +511,66 @@ document.addEventListener("DOMContentLoaded", function() {
     const allButtons = document.querySelectorAll(".toggle-button");
     allButtons.forEach(button => {
         button.querySelector(".toggle-icon").textContent = "➖";
+    });
+    
+    const checkboxes = document.querySelectorAll('.qemu-ga-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const vmId = this.getAttribute('data-vmid');
+            const newStatus = this.checked ? 'Yes' : 'No';
+            const originalState = this.checked;
+            
+            // Désactiver temporairement la case à cocher et montrer le chargement
+            this.disabled = true;
+            const originalCursor = this.style.cursor;
+            this.style.cursor = 'wait';
+            
+            // Créer un objet FormData
+            const formData = new FormData();
+            formData.append('update_qemu_ga', '1');
+            formData.append('vmid', vmId);
+            formData.append('status', newStatus);
+            formData.append('_token', '<?php echo csrf_token(); ?>');
+            
+            // Envoyer la requête AJAX
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                // Vérifions d'abord le type de contenu
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Si ce n'est pas du JSON, traitons la réponse comme un succès quand même
+                    console.log('Response is not JSON, but we will consider it a success');
+                    return { success: true };
+                }
+            })
+            .then(data => {
+                if (data.success) {
+                    console.log('No_Qemu_GA status updated successfully');
+                    // Mettre à jour l'état visuel de la case à cocher
+                    this.checked = newStatus === 'Yes';
+                } else {
+                    console.error('Failed to update No_Qemu_GA status:', data.message);
+                    // Revenir à l'état précédent en cas d'erreur
+                    this.checked = originalState;
+                }
+                // Réactiver la case à cocher
+                this.disabled = false;
+                this.style.cursor = originalCursor;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Revenir à l'état précédent en cas d'erreur
+                this.checked = originalState;
+                // Réactiver la case à cocher
+                this.disabled = false;
+                this.style.cursor = originalCursor;
+            });
+        });
     });
 });
 
@@ -490,17 +614,18 @@ $selected_columns = $_POST['columns'] ?? array_keys($available_columns);
     <label>State:
         <select name="state">
             <option value="">All</option>
-            <option value="running">Running</option>
-            <option value="stopped">Stopped</option>
+            <option value="running" <?php echo $filter_state === 'running' ? 'selected' : ''; ?>>Running</option>
+            <option value="stopped" <?php echo $filter_state === 'stopped' ? 'selected' : ''; ?>>Stopped</option>
         </select>
     </label>
-    <label>VM ID: <input type="text" name="vmid"></label>
-    <label>CPU Usage > <input type="number" name="cpu_percent" min="0"></label>
-    <label>Empty Disk: <input type="checkbox" name="disk_empty" value="yes"></label>
-    <label>Bigger Disk Usage > <input type="number" name="bigger_disk" min="0"></label>
-    <label>Oldest Snapshot > <input type="number" name="oldest_snapshot" min="0"></label>
-    <label>QEMU Info Null: <input type="checkbox" name="qemu_info" value="null"></label>
-    <label>HA State NOT UP: <input type="checkbox" name="HA_State" value="null"></label>
+    <label>VM ID: <input type="text" name="vmid" value="<?php echo escape_html($filter_vmid); ?>"></label>
+    <label>CPU Usage > <input type="number" name="cpu_percent" min="0" value="<?php echo escape_html($filter_cpu_percent); ?>"></label>
+    <label>Empty Disk: <input type="checkbox" name="disk_empty" value="yes" <?php echo $filter_disk_empty === 'yes' ? 'checked' : ''; ?>></label>
+    <label>Bigger Disk Usage > <input type="number" name="bigger_disk" min="0" value="<?php echo escape_html($filter_bigger_disk); ?>"></label>
+    <label>Oldest Snapshot > <input type="number" name="oldest_snapshot" min="0" value="<?php echo escape_html($filter_oldest_snapshot); ?>"></label>
+    <label>QEMU Info Null: <input type="checkbox" name="qemu_info" value="null" <?php echo $filter_qemu_info === 'null' ? 'checked' : ''; ?>></label>
+    <label>HA State NOT UP: <input type="checkbox" name="HA_State" value="null" <?php echo $filter_HA_State === 'null' ? 'checked' : ''; ?>></label>
+    <label>Hide No Qemu-GA VMs: <input type="checkbox" name="hide_no_qemu_ga" value="yes" <?php echo $filter_hide_no_qemu_ga === 'yes' ? 'checked' : ''; ?>></label>
     <button type="submit">Apply Filters</button>
 </form>
 
@@ -607,7 +732,11 @@ if (!empty($grouped_vms)) {
                     case 'HA_State':
                         echo escape_html($vm['HA_State']);
                         break;
-		}
+                    case 'No_Qemu_GA':
+                        $checkedStatus = (isset($vm['No_Qemu_GA']) && $vm['No_Qemu_GA'] === 'Yes') ? 'checked' : '';
+                        echo '<input type="checkbox" class="qemu-ga-checkbox" data-vmid="' . escape_html($vm['vmid']) . '" ' . $checkedStatus . '>';
+                        break;
+                }
                 echo '</td>';
             }
             echo '</tr>';
@@ -680,3 +809,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['download_csv'])) {
 
 $conn->close();
 ?>
+
