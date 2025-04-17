@@ -219,6 +219,7 @@ if ($result->num_rows > 0) {
     
     // SNMP configuration
     $timeout = 30;
+    //$oid = ".1.3.6.1.4.1.8072.1.3.2.3.1.2.9.99.117.115.116.111.109.80.86.69";
     $oids = [
         ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.49",
         ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.50", 
@@ -227,6 +228,9 @@ if ($result->num_rows > 0) {
         ".1.3.6.1.4.1.8072.1.3.2.3.1.2.10.99.117.115.116.111.109.80.86.69.53"
     ];
     $community = 'LibrenMSPublic';
+    //$snmpCommand = "snmpget -v2c -c $community $host $oid";
+
+
     $compressed_chunks = [];
 
     // Récupérer chaque partie individuellement
@@ -283,29 +287,31 @@ if ($result->num_rows > 0) {
             unlink("/tmp/xz_error_{$chunk_index}.log");
         }
         
+        // Réinitialiser le tableau output pour le prochain chunk
         $output = [];
     }
             // Extract JSON data
     if (!empty($json_parts)) {
         $combined_json = implode("", $json_parts);
+      echo $combined_json > "/opt/librenms/tmp.json";
         if (preg_match('/(\[\s*{.*}\s*\])/s', $combined_json, $matches) ||
             preg_match('/({.*})/s', $combined_json, $matches)) {
             $json_content = $matches[1];
-        }
-        preg_match('/\[\s*{.*}\s*]/s', $combined_json, $matches);
-        if (isset($matches[0])) {
-            $jsonResponse = $matches[0];
-            echo $jsonResponse;
-            $vms = json_decode($jsonResponse, true);
+      }
+            preg_match('/\[\s*{.*}\s*]/s', $combined_json, $matches);
+            if (isset($matches[0])) {
+                $jsonResponse = $matches[0];
+                echo $jsonResponse;
+                $vms = json_decode($jsonResponse, true);
 
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                echo 'Error decoding JSON: ' . json_last_error_msg();
-                exit;
-            }
-	   }
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    echo 'Error decoding JSON: ' . json_last_error_msg();
+                    exit;
+                }
+	}
 
     } else {
-        echo "No chunk successfully decompressed\n";
+        echo "Aucun chunk décompressé avec succès\n";
     }
 
     // Update Ceph information
@@ -375,10 +381,76 @@ if ($result->num_rows > 0) {
 	}
     }
 
+    $device_id = $row['device_id'];
     // Remove non-existing VMs
     foreach ($existing_vm_ids as $db_vmid) {
         if (!in_array($db_vmid, $vmid_list, true)) {
-            deleteVmFromVmid($conn, $db_vmid, $host);
+            // Get Delete_counter for the VM
+            $Get_delete_counter_query = "SELECT Delete_counter FROM proxmox WHERE vmid = ? AND device_id = ?";
+            $stmt = $conn->prepare($Get_delete_counter_query);
+            $stmt->bind_param("ii", $db_vmid, $device_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            // Verify if the poller returned any VM
+            if (count($vmid_list) > 0) {
+                // Log returned VM count
+                $date = date('Y-m-d H:i:s');
+                file_put_contents('/opt/librenms/logs/json_size.log', 
+                              "$date JSON file returned " . count($vmid_list) . " entries\n", 
+                              FILE_APPEND);
+                
+                if ($result->num_rows > 0) {
+                    $row = $result->fetch_assoc();
+                    $delete_counter = $row['Delete_counter'];
+                    
+                    if ($delete_counter >= 2) { // Delete after 3 failed polling attempts
+                        deleteVmFromVmid($conn, $db_vmid, $host);
+                        file_put_contents('/opt/librenms/logs/deletion.log', 
+                                      "$date Deleted VM $db_vmid after 3 failed polling attempts\n", 
+                                      FILE_APPEND);
+                    } else {
+                        $delete_counter += 1;
+                        $sqlUpdate = "UPDATE proxmox SET Delete_counter = ? WHERE vmid = ? AND device_id = ?";
+                        $stmt = $conn->prepare($sqlUpdate);
+                        $stmt->bind_param("iii", $delete_counter, $db_vmid, $device_id);
+                        
+                        if ($stmt->execute()) {
+                            echo "VM (ID: $db_vmid) delete_counter updated to $delete_counter.\n";
+                        } else {
+                            echo "Error when updating VM (ID: $db_vmid): " . $conn->error . "\n";
+                        }
+                    }
+                } else {
+                    // If delete_counter is not found, initialize it to 1
+                    $delete_counter = 1;
+                    $sqlUpdate = "UPDATE proxmox SET Delete_counter = ? WHERE vmid = ? AND device_id = ?";
+                    $stmt = $conn->prepare($sqlUpdate);
+                    $stmt->bind_param("iii", $delete_counter, $db_vmid, $device_id);
+                    
+                    if ($stmt->execute()) {
+                        echo "VM (ID: $db_vmid) delete_counter initialized to 1.\n";
+                    } else {
+                        echo "Error when initializing delete_counter for VM (ID: $db_vmid): " . $conn->error . "\n";
+                    }
+                }
+            } else {
+                // Logging when no VMs are returned
+                $date = date('Y-m-d H:i:s');
+                file_put_contents('/opt/librenms/logs/json_size.log', 
+                              "$date WARNING: JSON file returned 0 entries, skipping deletions\n", 
+                              FILE_APPEND);
+                echo "Warning: No VMs returned in polling. Skipping deletions to prevent data loss.\n";
+            }
+        } else {
+            // If the VM exists in the database, reset the delete counter
+            $sqlUpdate = "UPDATE proxmox SET Delete_counter = 0 WHERE vmid = ? AND device_id = ?";
+            $stmt = $conn->prepare($sqlUpdate);
+            $stmt->bind_param("ii", $db_vmid, $device_id);
+            $stmt->execute();
+            file_put_contents('/opt/librenms/logs/del_counter_reset.log', 
+                            "$date Delete_counter for $db_vmid reseted \n", 
+                            FILE_APPEND);
         }
     }
 } else {
