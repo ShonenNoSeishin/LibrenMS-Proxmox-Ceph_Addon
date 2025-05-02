@@ -763,7 +763,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['download_csv'])) {
     $result = $conn->query($sqlGetVms);
 
     // Define the CSV headers (columns)
-    $csv_headers = array('State', 'VM ID', 'Name', 'Node name', 'CPU Usage', 'CPU Percent Usage', 'Memory Used', 'Disk Usage', 'Bigger Disk Usage', 'Ceph Snapshots', 'Total Snapshots', 'Oldest Snapshot', 'Qemu Info', 'Network IN', 'Network OUT', 'Uptime', 'HA_State');
+    $csv_headers = array('State', 'VM ID', 'Name', 'Node name', 'CPU Usage', 'CPU Percent Usage', 'Memory Used', 'Disk Usage', 'Bigger Disk Usage', 'Ceph Snapshots', 'Total Snapshots', 'Oldest Snapshot', 'Qemu Info', 'Network IN', 'Network OUT', 'Uptime', 'HA_State', 'No_Qemu_GA', 'Delete_counter');
 
     // Open PHP output stream for CSV
     header('Content-Type: text/csv');
@@ -795,7 +795,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['download_csv'])) {
             $vm['netin'] ? formatBytes($vm['netin']) : 'NULL',
             $vm['netout'] ? formatBytes($vm['netout']) : 'NULL',
             $vm['uptime'] ? formatUptime($vm['uptime']) : 'NULL',
-	    $vm['HA_State'] ? ($vm['HA_State']) : 'NULL',
+	        $vm['HA_State'] ? ($vm['HA_State']) : 'NULL',
+            $vm['No_Qemu_GA'] ?? 'NULL',
+            $vm['Delete_counter'] ?? 'NULL',
 	];
             // Write the row to the CSV
             fputcsv($output, $row, ';');
