@@ -130,11 +130,11 @@ if (!function_exists('upsertVm')) {
         $CephTotalSnapshots = floatval($vm['CephTotalSnapshots']);
         $clustername = $vm['clustername'];
         $description = $name;
-	$qemu_info = $vm['qemuInfo'];
+	    $qemu_info = $vm['qemuInfo'];
         $oldest_snapshot = $vm['oldestSnapshot'];
         $node_name = $vm['node'];
         $last_update = $conn->real_escape_string($vm['last_update']);
-	$HA_State = $conn->real_escape_string($vm['HA_State']);
+	    $HA_State = $conn->real_escape_string($vm['HA_State']);
 
         // Check if VM exists
         $sqlCheckExists = "SELECT COUNT(*) FROM proxmox WHERE vmid = $vmid AND device_id = $device_id";
@@ -242,6 +242,32 @@ if ($result->num_rows > 0) {
 
         if (!$response) {
             echo "Impossible de récupérer le résultat SNMP pour l'OID $oid sur l'hôte $host:$port\n";
+            $date = date('Y-m-d H:i:s');
+                file_put_contents('/opt/librenms/logs/templogs.log', 
+                            "$date : Impossible de récupérer le résultat SNMP pour l'OID $oid sur l'hôte $host:$port \n", 
+                            FILE_APPEND);
+            usleep(3000000);
+            $response = shell_exec($snmpCommand);
+            if (!$response) {
+                $date = date('Y-m-d H:i:s');
+                file_put_contents('/opt/librenms/logs/templogs.log', 
+                                "$date : retry failed : $oid sur l'hôte $host:$port \n", 
+                                FILE_APPEND);
+                file_put_contents('/opt/librenms/logs/templogs.log', 
+                "$date : Code exit because polling error \n", 
+                FILE_APPEND);     
+                exit(); // sortir du code
+            }
+            else {
+                $date = date('Y-m-d H:i:s');
+                file_put_contents('/opt/librenms/logs/templogs.log', 
+                "$date : retry success : $oid sur l'hôte $host:$port \n", 
+                FILE_APPEND);
+                if (preg_match('/STRING: (.+)/', $response, $matches)) {
+                    $compressed_chunks[] = trim($matches[1]);
+                    echo "$host:$port connecté avec succès via SNMP pour l'OID $oid\n";
+                }
+            }
         }
         else {
             if (preg_match('/STRING: (.+)/', $response, $matches)) {
@@ -263,6 +289,10 @@ if ($result->num_rows > 0) {
         $decoded = base64_decode($chunk);
         if ($decoded === false) {
             echo "Erreur de décodage base64 sur le chunk $chunk_index\n";
+            $date = date('Y-m-d H:i:s');
+                file_put_contents('/opt/librenms/logs/templogs.log', 
+                            "$date : Erreur de décodage base64 sur le chunk $chunk_index \n", 
+                            FILE_APPEND);
             continue;
         }
         
@@ -316,17 +346,31 @@ if ($result->num_rows > 0) {
 
     // Update Ceph information
     $deviceId = (int) $device['device_id'];
-    $sqlCheckExists = "SELECT COUNT(*) FROM devices WHERE device_id = $deviceId";
+    $sqlCheckExists = "SELECT COUNT(*), ceph_state FROM devices WHERE device_id = $deviceId";
     $result = $conn->query($sqlCheckExists);
-
     if ($result) {
-        $exists = $result->fetch_row()[0];
+        $row = $result->fetch_row();
+        $exists = $row[0];
+        $currentCephState = $row[1] ?? null;
+        
         if ($exists > 0) {
             $cephInfo = $conn->real_escape_string($vms[0]['cephInfo']);
-            if ($conn->query("UPDATE devices SET ceph_state = '$cephInfo' WHERE device_id = $deviceId") === TRUE) {
-                echo "Ceph info updated successfully.\n";
+            if (strpos($cephInfo, "WARNING") === true) { // if contains WARNING
+                $date = date('Y-m-d H:i:s');
+                file_put_contents('/opt/librenms/logs/templogs.log', 
+                            "$date : Pas de Waring $cephInfo \n", 
+                            FILE_APPEND);
+            }            
+            
+            // Ne mettre à jour que si la nouvelle valeur est différente de la valeur actuelle
+            if ($currentCephState !== $cephInfo && $cephInfo !== null) {
+                if ($conn->query("UPDATE devices SET ceph_state = '$cephInfo' WHERE device_id = $deviceId") === TRUE) {
+                    echo "Ceph info updated successfully.\n";
+                } else {
+                    echo "Error updating CephInfo on device: $deviceId: " . $conn->error . "\n";
+                }
             } else {
-                echo "Error updating CephInfo on device: $deviceId: " . $conn->error . "\n";
+                echo "No update needed for device $deviceId, ceph_state is already up to date.\n";
             }
         } else {
             echo "$deviceId doesn't exist.\n";
@@ -384,13 +428,19 @@ if ($result->num_rows > 0) {
     $device_id = $row['device_id'];
     // Remove non-existing VMs
     foreach ($existing_vm_ids as $db_vmid) {
+        // Get Delete_counter for the VM
+        $Get_delete_counter_query = "SELECT Delete_counter FROM proxmox WHERE vmid = ? AND device_id = ?";
+        $stmt = $conn->prepare($Get_delete_counter_query);
+        $stmt->bind_param("ii", $db_vmid, $device_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
         if (!in_array($db_vmid, $vmid_list, true)) {
             // Get Delete_counter for the VM
-            $Get_delete_counter_query = "SELECT Delete_counter FROM proxmox WHERE vmid = ? AND device_id = ?";
-            $stmt = $conn->prepare($Get_delete_counter_query);
-            $stmt->bind_param("ii", $db_vmid, $device_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
+            // $Get_delete_counter_query = "SELECT Delete_counter FROM proxmox WHERE vmid = ? AND device_id = ?";
+            // $stmt = $conn->prepare($Get_delete_counter_query);
+            // $stmt->bind_param("ii", $db_vmid, $device_id);
+            // $stmt->execute();
+            // $result = $stmt->get_result();
             
             // Verify if the poller returned any VM
             if (count($vmid_list) > 0) {
@@ -417,6 +467,10 @@ if ($result->num_rows > 0) {
                         
                         if ($stmt->execute()) {
                             echo "VM (ID: $db_vmid) delete_counter updated to $delete_counter.\n";
+                            $date = date('Y-m-d H:i:s');
+                            file_put_contents('/opt/librenms/logs/json_size.log', 
+                                        "$date WARNING: VM (ID: $db_vmid) Delete_counter is increased to $delete_counter\n", 
+                                        FILE_APPEND);
                         } else {
                             echo "Error when updating VM (ID: $db_vmid): " . $conn->error . "\n";
                         }
@@ -427,6 +481,11 @@ if ($result->num_rows > 0) {
                     $sqlUpdate = "UPDATE proxmox SET Delete_counter = ? WHERE vmid = ? AND device_id = ?";
                     $stmt = $conn->prepare($sqlUpdate);
                     $stmt->bind_param("iii", $delete_counter, $db_vmid, $device_id);
+
+                    $date = date('Y-m-d H:i:s');
+                    file_put_contents('/opt/librenms/logs/json_size.log', 
+                                "$date WARNING: VM Delete_counter is initialised to 1\n", 
+                                FILE_APPEND);
                     
                     if ($stmt->execute()) {
                         echo "VM (ID: $db_vmid) delete_counter initialized to 1.\n";
@@ -444,13 +503,21 @@ if ($result->num_rows > 0) {
             }
         } else {
             // If the VM exists in the database, reset the delete counter
-            $sqlUpdate = "UPDATE proxmox SET Delete_counter = 0 WHERE vmid = ? AND device_id = ?";
-            $stmt = $conn->prepare($sqlUpdate);
-            $stmt->bind_param("ii", $db_vmid, $device_id);
-            $stmt->execute();
-            file_put_contents('/opt/librenms/logs/del_counter_reset.log', 
-                            "$date Delete_counter for $db_vmid reseted \n", 
-                            FILE_APPEND);
+            $date = date('Y-m-d H:i:s');
+            if ($result->num_rows > 0) {
+                $row = $result->fetch_assoc();
+                $delete_counter = $row['Delete_counter'];
+            }
+            if ($delete_counter > 0) {
+                $sqlUpdate = "UPDATE proxmox SET Delete_counter = 0 WHERE vmid = ? AND device_id = ? AND Delete_counter != 0";
+                $stmt = $conn->prepare($sqlUpdate);
+                $stmt->bind_param("ii", $db_vmid, $device_id);
+                $stmt->execute();
+                file_put_contents('/opt/librenms/logs/del_counter_reset.log', 
+                                "$date Delete_counter for $db_vmid reseted \n", 
+                                FILE_APPEND);
+            }
+
         }
     }
 } else {
