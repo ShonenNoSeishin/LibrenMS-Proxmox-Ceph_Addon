@@ -118,9 +118,9 @@ function escape_html($string) {
     return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
 }
 
-// Get Proxmox clusters from database
-$pmxcl = dbFetchRows('SELECT DISTINCT(app_instance) FROM applications WHERE app_type = ?', ['proxmox']);
-$instance = Request::get('instance', $pmxcl[0]['app_instance'] ?? null);
+$pmxcl = dbFetchRows('SELECT DISTINCT(`app_instance`) FROM `applications` WHERE `app_type` = ?', ['proxmox']);
+$default_instance = ! empty($pmxcl) ? $pmxcl[0]['app_instance'] : null;
+$instance = $vars['instance'] ?? $default_instance;
 
 // Navigation bar for clusters
 print_optionbar_start();
@@ -133,14 +133,17 @@ foreach ($pmxcl as $pmxc) {
     if ($selected) {
         echo "<span class='pagemenu-selected'>";
     }
-    echo generate_link(
-        \LibreNMS\Util\StringHelpers::niceCase($pmxc->app_instance),
-        [
-            'page' => 'apps',
-            'app' => 'proxmox',
-            'instance' => $pmxc['app_instance']
-        ]
-    );
+
+    echo generate_link($pmxc['app_instance'], ['page' => 'apps', 'app' => 'proxmox', 'instance' => $pmxc['app_instance']]);
+
+    // echo generate_link(
+    //     \LibreNMS\Util\StringHelpers::niceCase($pmxc->app_instance),
+    //     [
+    //         'page' => 'apps',
+    //         'app' => 'proxmox',
+    //         'instance' => $pmxc['app_instance']
+    //     ]
+    // );
     if ($selected) {
         echo '</span>';
     }
