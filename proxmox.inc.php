@@ -1,4 +1,5 @@
 <?php
+
 include "includes/polling/applications/proxmoxCustom.inc.php";
 
 use LibreNMS\RRD\RrdDefinition;
@@ -100,37 +101,32 @@ if (! empty($proxmox)) {
                 ],
                 'rrd_def' => $rrd_def,
             ];
+            app('Datastore')->put($device, 'app', $tags, $fields);
 
-            data_update($device, 'app', $tags, $fields);
-	    //print_r([$vmid, $pmxcache[$pmxcluster][$vmid]]);
-	    // OLD WAY
-            // if (proxmox_vm_exists($vmid, $pmxcluster, $pmxcache) === true) {
-            //     dbUpdate([
-            //         'device_id' => $device['device_id'],
-            //         'last_seen' => ['NOW()'],
-            //         'description' => $vmdesc,
-            //     ], $name, '`vmid` = ? AND `cluster` = ?', [$vmid, $pmxcluster]);
-            // } else {
-            //     $pmxcache[$pmxcluster][$vmid] = dbInsert([
-            //         'cluster' => $pmxcluster,
-            //         'vmid' => $vmid,
-            //         'description' => $vmdesc,
-            //         'device_id' => $device['device_id'],
-            //     ], $name);
-            // }
-	    $portid = proxmox_port_exists($vmid, $pmxcluster, $vmport);
-	    if ($portid !== false) {
-            //if ($portid = proxmox_port_exists($vmid, $pmxcluster, $vmport) !== false) {
+            if (proxmox_vm_exists($vmid, $pmxcluster, $pmxcache) === true) {
+                dbUpdate([
+                    'device_id' => $device['device_id'],
+                    'last_seen' => ['NOW()'],
+                    'description' => $vmdesc,
+                ], $name, '`vmid` = ? AND `cluster` = ?', [$vmid, $pmxcluster]);
+            } else {
+                $pmxcache[$pmxcluster][$vmid] = dbInsert([
+                    'cluster' => $pmxcluster,
+                    'vmid' => $vmid,
+                    'description' => $vmdesc,
+                    'device_id' => $device['device_id'],
+                ], $name);
+            }
+
+            if ($portid = proxmox_port_exists($vmid, $pmxcluster, $vmport) !== false) {
                 dbUpdate(
                     ['last_seen' => ['NOW()']],
                     'proxmox_ports',
                     '`vm_id` = ? AND `port` = ?',
-		    //[$vmid, $vmport]
                     [$pmxcache[$pmxcluster][$vmid], $vmport]
                 );
             } else {
-		dbInsert(['vm_id' => $vmid, 'port' => $vmport], 'proxmox_ports');
-//                dbInsert(['vm_id' => $pmxcache[$pmxcluster][$vmid], 'port' => $vmport], 'proxmox_ports');
+                dbInsert(['vm_id' => $pmxcache[$pmxcluster][$vmid], 'port' => $vmport], 'proxmox_ports');
             }
         }
     }
