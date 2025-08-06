@@ -1,137 +1,57 @@
 <?php
 
-include "includes/polling/applications/proxmoxCustom.inc.php";
+/*
+ * Copyright (C) 2015 Mark Schouten <mark@tuxis.nl>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; version 2 dated June,
+ * 1991.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * See https://www.gnu.org/licenses/gpl.txt for the full license
+ */
 
-use LibreNMS\RRD\RrdDefinition;
-
-$name = 'proxmox';
-
-if (! function_exists('proxmox_port_exists')) {
-    /**
-     * Check if a port on a Proxmox VM exists
-     *
-     * @param  string  $p  Port name
-     * @param  string  $c  Clustername
-     * @param  int  $i  VM ID
-     * @return int|bool The port-ID if the port exists, false if it doesn't exist
-     */
-    function proxmox_port_exists($i, $c, $p)
-    {
-        if ($row = dbFetchRow('SELECT pmp.id FROM proxmox_ports pmp, proxmox pm WHERE pm.id = pmp.vm_id AND pmp.port = ? AND pm.cluster = ? AND pm.vmid = ?', [$p, $c, $i])) {
-            return $row['id'];
-        }
-
-        return false;
-    }
+/**
+ * Fetch all VM's in a Proxmox Cluster
+ *
+ * @param  string  $c  Clustername
+ * @return array An array with all the VM's on this cluster
+ */
+function proxmox_cluster_vms($c)
+{
+    return dbFetchRows('SELECT * FROM proxmox WHERE cluster = ? ORDER BY vmid', [$c]);
 }
 
-if (! function_exists('proxmox_vm_exists')) {
-    /**
-     * Check if a Proxmox VM exists
-     *
-     * @param  int  $i  VM ID
-     * @param  string  $c  Clustername
-     * @param  array  $pmxcache  Reference to the Proxmox VM Cache
-     * @return bool true if the VM exists, false if it doesn't
-     */
-    function proxmox_vm_exists($i, $c, &$pmxcache)
-    {
-        if (isset($pmxcache[$c][$i]) && $pmxcache[$c][$i] > 0) {
-            return true;
-        }
-        if ($row = dbFetchRow('SELECT id FROM proxmox WHERE vmid = ? AND cluster = ?', [$i, $c])) {
-            $pmxcache[$c][$i] = (int) $row['id'];
-
-            return true;
-        }
-
-        return false;
-    }
+/**
+ * Fetch all VM's on a Proxmox node
+ *
+ * @param  int  $n  device_id
+ * @return array An array with all the VM's on this node
+ */
+function proxmox_node_vms($n)
+{
+    return dbFetchRows('SELECT * FROM proxmox WHERE device_id = ? ORDER BY vmid', [$n]);
 }
 
-if (\LibreNMS\Config::get('enable_proxmox') && ! empty($agent_data['app'][$name])) {
-    $proxmox = $agent_data['app'][$name];
-} elseif (\LibreNMS\Config::get('enable_proxmox')) {
-    $options = '-Oqv';
-    $oid = '.1.3.6.1.4.1.8072.1.3.2.3.1.2.7.112.114.111.120.109.111.120';
-    $proxmox = snmp_get($device, $oid, $options);
-    $proxmox = preg_replace('/^.+\n/', '', $proxmox);
-    $proxmox = str_replace("<<<app-proxmox>>>\n", '', $proxmox);
+/**
+ * Fetch all info about a Proxmox VM
+ *
+ * @param  int  $vmid  Proxmox VM ID
+ * @param  string  $c  Clustername
+ * @return array An array with all info of this VM on this cluster, including ports
+ */
+function proxmox_vm_info($vmid, $c)
+{
+    $vm = dbFetchRow('SELECT pm.*, d.hostname AS host, d.device_id FROM proxmox pm, devices d WHERE pm.device_id = d.device_id AND pm.vmid = ? AND pm.cluster = ?', [$vmid, $c]);
+    $appid = dbFetchRow('SELECT app_id FROM applications WHERE device_id = ? AND app_type = ?', [$vm['device_id'], 'proxmox']);
+
+    $vm['ports'] = dbFetchRows('SELECT * FROM proxmox_ports WHERE vm_id = ?', [$vm['vmid']]);
+    $vm['app_id'] = $appid['app_id'];
+
+    return $vm;
 }
-
-if (! empty($proxmox)) {
-    $pmxlines = explode("\n", $proxmox);
-    $pmxcluster = array_shift($pmxlines);
-    dbUpdate(
-        ['device_id' => $device['device_id'], 'app_type' => $name, 'app_instance' => $pmxcluster],
-        'applications',
-        '`device_id` = ? AND `app_type` = ?',
-        [$device['device_id'], $name]
-    );
-
-    $metrics = [];
-    if (count($pmxlines) > 0) {
-        $pmxcache = [];
-
-        foreach ($pmxlines as $vm) {
-            $vm = str_replace('"', '', $vm);
-            [$vmid, $vmport, $vmpin, $vmpout, $vmdesc] = explode('/', $vm, 5);
-            echo "Proxmox ($pmxcluster): $vmdesc: $vmpin/$vmpout/$vmport\n";
-
-            $rrd_def = RrdDefinition::make()
-                ->addDataset('INOCTETS', 'DERIVE', 0, 12500000000)
-                ->addDataset('OUTOCTETS', 'DERIVE', 0, 12500000000);
-            $fields = [
-                'INOCTETS' => $vmpin,
-                'OUTOCTETS' => $vmpout,
-            ];
-
-            $proxmox_metric_prefix = "pmxcluster{$pmxcluster}_vmid{$vmid}_vmport$vmport";
-            $metrics[$proxmox_metric_prefix] = $fields;
-            $tags = [
-                'name' => $name,
-                'app_id' => $app->app_id,
-                'pmxcluster' => $pmxcluster,
-                'vmid' => $vmid,
-                'vmport' => $vmport,
-                'rrd_proxmox_name' => [
-                    'pmxcluster' => $pmxcluster,
-                    'vmid' => $vmid,
-                    'vmport' => $vmport,
-                ],
-                'rrd_def' => $rrd_def,
-            ];
-            app('Datastore')->put($device, 'app', $tags, $fields);
-
-            if (proxmox_vm_exists($vmid, $pmxcluster, $pmxcache) === true) {
-                dbUpdate([
-                    'device_id' => $device['device_id'],
-                    'last_seen' => ['NOW()'],
-                    'description' => $vmdesc,
-                ], $name, '`vmid` = ? AND `cluster` = ?', [$vmid, $pmxcluster]);
-            } else {
-                $pmxcache[$pmxcluster][$vmid] = dbInsert([
-                    'cluster' => $pmxcluster,
-                    'vmid' => $vmid,
-                    'description' => $vmdesc,
-                    'device_id' => $device['device_id'],
-                ], $name);
-            }
-
-            if ($portid = proxmox_port_exists($vmid, $pmxcluster, $vmport) !== false) {
-                dbUpdate(
-                    ['last_seen' => ['NOW()']],
-                    'proxmox_ports',
-                    '`vm_id` = ? AND `port` = ?',
-                    [$pmxcache[$pmxcluster][$vmid], $vmport]
-                );
-            } else {
-                dbInsert(['vm_id' => $pmxcache[$pmxcluster][$vmid], 'port' => $vmport], 'proxmox_ports');
-            }
-        }
-    }
-
-    update_application($app, $proxmox, $metrics);
-}
-
-unset($pmxlines, $pmxcluster, $pmxcdir, $proxmox, $pmxcache);
