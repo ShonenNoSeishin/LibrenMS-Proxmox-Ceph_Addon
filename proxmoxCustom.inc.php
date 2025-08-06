@@ -149,7 +149,10 @@ if (!function_exists('upsertVm')) {
                     hostname = '$hostname',
                     device_id = $device_id,
                     name = '$name',
-                    status = '$status',
+                    status = CASE 
+                        WHEN ('$status' = 'prelaunch') THEN status
+                        ELSE \"$status\"
+                    END,
                     cpu = $cpu,
                     cpus = $cpus,
                     cpu_percent = $cpu_percent,
@@ -523,6 +526,35 @@ if ($result->num_rows > 0) {
 } else {
     echo "Device with hostname '$currentHost' not found\n";
 }
+
+// Chemin du fichier historique
+$history_file = '/opt/librenms/tmp_vms_history.json';
+
+// Charger l'historique existant
+if (file_exists($history_file)) {
+    $history = json_decode(file_get_contents($history_file), true);
+    if (!is_array($history)) {
+        $history = [];
+    }
+} else {
+    $history = [];
+}
+
+// Ajouter la nouvelle exécution
+if (!empty($vms)) {
+    $history[] = [
+        'timestamp' => date('Y-m-d H:i:s'),
+        'vms' => $vms
+    ];
+}
+
+// Garder seulement les 200 dernières exécutions
+if (count($history) > 200) {
+    $history = array_slice($history, -200);
+}
+
+// Sauvegarder l'historique
+file_put_contents($history_file, json_encode($history, JSON_PRETTY_PRINT));
 
 // Close the database connection
 $conn->close();
