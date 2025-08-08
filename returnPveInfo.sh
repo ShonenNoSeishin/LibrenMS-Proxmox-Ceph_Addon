@@ -177,7 +177,7 @@ process_vm() {
 		return 1  # pas trouvé
 	}
 
-	if [[ "$VM_STATUS" != "running" ]] && [ ! -z "$VM_STATUS" ]; then
+	if [[ "$VM_STATUS" != "running" ]] && [ ! -z "$VM_STATUS" ] && [[ "$VM_STATUS" != "stopped" ]]; then
 		# To check qmp_status in real time : curl -s -k --connect-timeout $TIMEOUT -H "$Authorization" "https://$PVE_IP:8006/api2/json/nodes/$NODE/qemu/$VMID/status/current" | jq '.data | {cpu, cpus, diskread, diskwrite, maxdisk, maxmem, mem, name, netin, netout, pid, status, tags, uptime, vmid, qmpstatus, tags}'
 		sleep 2 # Je reçois environ 10 à 15 logs par salve de snapshots
 		# Request the current status of the VM
