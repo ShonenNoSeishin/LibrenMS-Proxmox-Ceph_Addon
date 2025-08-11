@@ -403,8 +403,9 @@ process_vm() {
 		--arg oldestSnapshot "$max_days" \
 		--arg node "$NODE" \
 		--arg vmid "$VMID" \
+		--arg vm_status "$VM_STATUS" \
 		--arg last_update "$last_update" \
-		'. + {vmid: $vmid, cpu: $cpu, cpu_percent: $cpu_percent, disk: $disk, biggerDiskPercentUsage: $biggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, HA_State: $HA_State, cephPoolUsage: $cephPoolUsage, oldestSnapshot: $oldestSnapshot, node: $node, last_update: $last_update}' 2>/dev/null)
+		'. + {vmid: $vmid, cpu: $cpu, cpu_percent: $cpu_percent, disk: $disk, biggerDiskPercentUsage: $biggerDiskPercentUsage, cephSnapshots: $cephSnapshots, CephTotalSnapshots: $totalSnapshots, clustername: $clustername, qemuInfo: $qemuInfo, cephInfo: $cephInfo, HA_State: $HA_State, cephPoolUsage: $cephPoolUsage, oldestSnapshot: $oldestSnapshot, node: $node, qmpstatus: $vm_status, last_update: $last_update}' 2>/dev/null)
 
 	# Check if JSON creation failed
 	if [ $? -ne 0 ] || [ -z "$VM_JSON" ]; then
@@ -417,7 +418,7 @@ process_vm() {
 		else
 			((FAILED_VMS++))
 			# Create minimal fallback JSON with basic information
-			VM_JSON="{\"vmid\":\"$VMID\",\"node\":\"$NODE\",\"status\":\"$VM_STATUS\",\"last_update\":\"$last_update\",\"error\":\"JSON creation failed\"}"
+			VM_JSON="{\"vmid\":\"$VMID\",\"node\":\"$NODE\",\"qmpstatus\":\"$VM_STATUS\",\"last_update\":\"$last_update\",\"error\":\"JSON creation failed\"}"
 		fi
 	fi
 
