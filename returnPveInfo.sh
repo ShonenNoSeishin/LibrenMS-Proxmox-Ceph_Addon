@@ -626,6 +626,7 @@ if [ $? -eq 0 ]; then
 	if [ $? -eq 0 ] && [ -s "/usr/lib/TMP_PVE_INFO.txt.new" ]; then
 		mv "/usr/lib/TMP_PVE_INFO.txt.new" "/usr/lib/TMP_PVE_INFO.txt"
 		cp /usr/lib/TMP_PVE_INFO.txt /usr/lib/PVE_INFO.txt
+		cp /usr/lib/TMP_PVE_INFO.txt /home/odoo_fetcher/PVE_INFO.txt # pour pouvoir fetch sur odoo
 	else
 		log_message "ERROR: Failed to create output file"
 		exit 1
